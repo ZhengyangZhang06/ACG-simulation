@@ -3,3 +3,13 @@ __pycache__
 src/outputs
 src/output
 src/output_new
+/SPH_Taichi
+/taichi_sph
+/SPlisHSPlasH
+.DS_Store
+*.png
+*.mp4
+*.ini
+*.pyc
+.idea
+/__pycache__/
