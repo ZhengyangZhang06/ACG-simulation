@@ -143,7 +143,7 @@ class RigidBody:
     velocity: Vector
     orientation: Quaternion = (1.0, 0.0, 0.0, 0.0)
     angular_velocity: Vector = (0.0, 0.0, 0.0)
-    restitution: float = 0.35
+    restitution: float = 0.05
     linear_damping: float = 0.01
     angular_damping: float = 0.02
     forces: List[Vector] = field(default_factory=list)
@@ -180,6 +180,7 @@ class SimulationConfig:
     gravity: Vector = (0.0, -9.81, 0.0)
     ground_height: float = 0.0
     ground_friction: float = 0.4
+    resting_speed_epsilon: float = 0.2
 
 
 class RigidBodySimulation:
@@ -304,7 +305,7 @@ class RigidBodySimulation:
         # Resolve normal impulse, accounting for angular effect from the contact lever arm.
         contact_velocity = vec_add(body.velocity, vec_cross(body.angular_velocity, contact_offset))
         normal_speed = vec_dot(contact_velocity, normal)
-        if normal_speed < 0.0:
+        if normal_speed < -self.config.resting_speed_epsilon:
             r_cross_n = vec_cross(contact_offset, normal)
             angular_term = vec_dot(vec_cross(self._apply_inverse_inertia(body, r_cross_n), contact_offset), normal)
             impulse_denom = (1.0 / body.mass) + angular_term
