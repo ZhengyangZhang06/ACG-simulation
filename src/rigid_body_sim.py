@@ -167,6 +167,11 @@ class RigidBody:
         self.forces.clear()
         self.torques.clear()
 
+    @property
+    def bounding_radius(self) -> float:
+        w, h, d = self.size
+        return 0.5 * math.sqrt(w * w + h * h + d * d)
+
 
 @dataclass
 class SimulationConfig:
@@ -219,6 +224,8 @@ class RigidBodySimulation:
 
             self._resolve_ground_contact(body)
             body.clear_accumulators()
+
+        self._resolve_body_collisions()
 
         self.time += dt
         self._record_frame()
@@ -350,6 +357,194 @@ class RigidBodySimulation:
             torque_local[2] / inertia[2] if inertia[2] != 0.0 else 0.0,
         )
         return mat3_mul_vec(rotation, delta_local)
+
+    def _resolve_body_collisions(self) -> None:
+        if len(self.bodies) < 2:
+            return
+
+        for i in range(len(self.bodies)):
+            body_a = self.bodies[i]
+            for j in range(i + 1, len(self.bodies)):
+                body_b = self.bodies[j]
+                collision = self._sat_test_boxes(body_a, body_b)
+                if collision is None:
+                    continue
+                normal, penetration = collision
+                contact_point_a = self._support_point_on_box(body_a, normal)
+                contact_point_b = self._support_point_on_box(body_b, vec_scale(normal, -1.0))
+                contact_offset_a = vec_sub(contact_point_a, body_a.position)
+                contact_offset_b = vec_sub(contact_point_b, body_b.position)
+
+                self._apply_positional_correction(body_a, body_b, normal, penetration)
+                self._apply_collision_impulse(body_a, body_b, normal, contact_offset_a, contact_offset_b)
+
+    def _apply_collision_impulse(
+        self,
+        body_a: RigidBody,
+        body_b: RigidBody,
+        normal: Vector,
+        contact_offset_a: Vector,
+        contact_offset_b: Vector,
+    ) -> None:
+
+        vel_a = vec_add(body_a.velocity, vec_cross(body_a.angular_velocity, contact_offset_a))
+        vel_b = vec_add(body_b.velocity, vec_cross(body_b.angular_velocity, contact_offset_b))
+        relative_velocity = vec_sub(vel_b, vel_a)
+        normal_speed = vec_dot(relative_velocity, normal)
+        if normal_speed >= 0.0:
+            return
+
+        inv_mass_a = 1.0 / body_a.mass if body_a.mass > 0.0 else 0.0
+        inv_mass_b = 1.0 / body_b.mass if body_b.mass > 0.0 else 0.0
+        raxn = vec_cross(contact_offset_a, normal)
+        rbxn = vec_cross(contact_offset_b, normal)
+        angular_term = vec_dot(
+            vec_cross(self._apply_inverse_inertia(body_a, raxn), contact_offset_a),
+            normal,
+        )
+        angular_term += vec_dot(
+            vec_cross(self._apply_inverse_inertia(body_b, rbxn), contact_offset_b),
+            normal,
+        )
+        denom = inv_mass_a + inv_mass_b + angular_term
+        if denom < 1e-6:
+            return
+
+        restitution = max(0.0, min(body_a.restitution, body_b.restitution))
+        jn = -(1.0 + restitution) * normal_speed / denom
+        impulse = vec_scale(normal, jn)
+
+        body_a.velocity = vec_sub(body_a.velocity, vec_scale(impulse, inv_mass_a))
+        body_b.velocity = vec_add(body_b.velocity, vec_scale(impulse, inv_mass_b))
+        body_a.angular_velocity = vec_sub(
+            body_a.angular_velocity,
+            self._apply_inverse_inertia(body_a, vec_cross(contact_offset_a, impulse)),
+        )
+        body_b.angular_velocity = vec_add(
+            body_b.angular_velocity,
+            self._apply_inverse_inertia(body_b, vec_cross(contact_offset_b, impulse)),
+        )
+
+    def _apply_positional_correction(
+        self,
+        body_a: RigidBody,
+        body_b: RigidBody,
+        normal: Vector,
+        penetration: float,
+    ) -> None:
+        inv_mass_a = 1.0 / body_a.mass if body_a.mass > 0.0 else 0.0
+        inv_mass_b = 1.0 / body_b.mass if body_b.mass > 0.0 else 0.0
+        inv_mass_sum = inv_mass_a + inv_mass_b
+        if inv_mass_sum == 0.0:
+            return
+
+        correction_percent = 0.8
+        slop = 1e-3
+        correction_mag = max(penetration - slop, 0.0) * correction_percent / inv_mass_sum
+        if correction_mag <= 0.0:
+            return
+
+        correction = vec_scale(normal, correction_mag)
+        body_a.position = vec_sub(body_a.position, vec_scale(correction, inv_mass_a))
+        body_b.position = vec_add(body_b.position, vec_scale(correction, inv_mass_b))
+
+    def _support_point_on_box(self, body: RigidBody, direction: Vector) -> Vector:
+        direction_length = vec_length(direction)
+        if direction_length < 1e-6:
+            direction = (1.0, 0.0, 0.0)
+        rotation = quat_to_matrix(body.orientation)
+        dir_local = mat3_mul_vec_transpose(rotation, direction)
+        hx, hy, hz = body.size[0] * 0.5, body.size[1] * 0.5, body.size[2] * 0.5
+        local_point = (
+            hx if dir_local[0] >= 0.0 else -hx,
+            hy if dir_local[1] >= 0.0 else -hy,
+            hz if dir_local[2] >= 0.0 else -hz,
+        )
+        world_point = mat3_mul_vec(rotation, local_point)
+        return vec_add(world_point, body.position)
+
+    def _sat_test_boxes(self, body_a: RigidBody, body_b: RigidBody) -> Tuple[Vector, float] | None:
+        axes_a = self._body_axes(body_a)
+        axes_b = self._body_axes(body_b)
+        half_a = (body_a.size[0] * 0.5, body_a.size[1] * 0.5, body_a.size[2] * 0.5)
+        half_b = (body_b.size[0] * 0.5, body_b.size[1] * 0.5, body_b.size[2] * 0.5)
+
+        R = [[vec_dot(axes_a[i], axes_b[j]) for j in range(3)] for i in range(3)]
+        AbsR = [[abs(R[i][j]) + 1e-6 for j in range(3)] for i in range(3)]
+
+        translation = vec_sub(body_b.position, body_a.position)
+        t = [vec_dot(translation, axes_a[i]) for i in range(3)]
+
+        min_overlap = math.inf
+        best_axis = None
+
+        def try_axis(axis: Vector, overlap: float, direction_hint: float) -> None:
+            nonlocal min_overlap, best_axis
+            if overlap < min_overlap:
+                axis_length = vec_length(axis)
+                if axis_length < 1e-6:
+                    return
+                sign = 1.0 if direction_hint >= 0.0 else -1.0
+                best_axis = vec_scale(axis, sign / axis_length)
+                min_overlap = overlap
+
+        # Axes from body A
+        for i in range(3):
+            ra = half_a[i]
+            rb = sum(half_b[j] * AbsR[i][j] for j in range(3))
+            distance = abs(t[i])
+            overlap = ra + rb - distance
+            if overlap < 0.0:
+                return None
+            try_axis(axes_a[i], overlap, t[i])
+
+        # Axes from body B
+        for j in range(3):
+            ra = sum(half_a[i] * AbsR[i][j] for i in range(3))
+            tb = vec_dot(translation, axes_b[j])
+            rb = half_b[j]
+            overlap = ra + rb - abs(tb)
+            if overlap < 0.0:
+                return None
+            try_axis(axes_b[j], overlap, tb)
+
+        # Axes from cross products
+        for i in range(3):
+            for j in range(3):
+                axis = vec_cross(axes_a[i], axes_b[j])
+                axis_length = vec_length(axis)
+                if axis_length < 1e-6:
+                    continue
+                ra = (
+                    half_a[(i + 1) % 3] * AbsR[(i + 2) % 3][j]
+                    + half_a[(i + 2) % 3] * AbsR[(i + 1) % 3][j]
+                )
+                rb = (
+                    half_b[(j + 1) % 3] * AbsR[i][(j + 2) % 3]
+                    + half_b[(j + 2) % 3] * AbsR[i][(j + 1) % 3]
+                )
+                distance = abs(
+                    t[(i + 2) % 3] * R[(i + 1) % 3][j]
+                    - t[(i + 1) % 3] * R[(i + 2) % 3][j]
+                )
+                overlap = ra + rb - distance
+                if overlap < 0.0:
+                    return None
+                direction_hint = vec_dot(axis, translation)
+                try_axis(axis, overlap, direction_hint)
+
+        if best_axis is None or min_overlap is math.inf:
+            return None
+
+        return best_axis, min_overlap
+
+    def _body_axes(self, body: RigidBody) -> Tuple[Vector, Vector, Vector]:
+        rotation = quat_to_matrix(body.orientation)
+        return (
+            (rotation[0][0], rotation[1][0], rotation[2][0]),
+            (rotation[0][1], rotation[1][1], rotation[2][1]),
+            (rotation[0][2], rotation[1][2], rotation[2][2]),
+        )
 
 
 def demo_scene() -> List[RigidBody]:
