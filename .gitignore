@@ -1,5 +1,4 @@
-output
-__pycache__
+**/output/
 src/outputs
 src/output
 src/output_new
@@ -12,4 +11,6 @@ src/output_new
 *.ini
 *.pyc
 .idea
-/__pycache__/
+**/__pycache__/
+**/ply_output/
+**/mesh_output/
