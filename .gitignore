@@ -1,0 +1,10 @@
+/SPH_Taichi
+/taichi_sph
+/SPlisHSPlasH
+.DS_Store
+*.png
+*.mp4
+*.ini
+*.pyc
+.idea
+/__pycache__/
