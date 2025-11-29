@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Tuple, cast
 import json
 import math
-
 Vector = Tuple[float, float, float]
 Quaternion = Tuple[float, float, float, float]  # (w, x, y, z)
 Matrix3 = Tuple[Vector, Vector, Vector]
@@ -283,83 +282,74 @@ class RigidBodySimulation:
         }
         self.history.append(frame_data)
 
-    @staticmethod
-    def _inverse_inertia_apply(body: RigidBody, torque: Vector, rotation: Matrix3) -> Vector:
-        inertia = body.inertia_tensor_diag
-        inv_inertia = (
-            0.0 if inertia[0] == 0.0 else 1.0 / inertia[0],
-            0.0 if inertia[1] == 0.0 else 1.0 / inertia[1],
-            0.0 if inertia[2] == 0.0 else 1.0 / inertia[2],
-        )
-        torque_local = mat3_mul_vec_transpose(rotation, torque)
-        local_response = (
-            torque_local[0] * inv_inertia[0],
-            torque_local[1] * inv_inertia[1],
-            torque_local[2] * inv_inertia[2],
-        )
-        return mat3_mul_vec(rotation, local_response)
+    def _resolve_ground_contact(self, body: RigidBody) -> None:
+        # Coarse bounding sphere check using the smallest half-extent.
+        min_half_extent = 0.5 * min(body.size)
+        penetration = (body.position[1] - min_half_extent) - self.config.ground_height
+        if penetration >= 0:
+            return
 
-    @staticmethod
-    def _apply_impulse(body: RigidBody, impulse: Vector, contact_offset: Vector, rotation: Matrix3) -> None:
-        inv_mass = 1.0 / body.mass
-        body.velocity = vec_add(body.velocity, vec_scale(impulse, inv_mass))
-        angular_impulse = vec_cross(contact_offset, impulse)
-        angular_delta = RigidBodySimulation._inverse_inertia_apply(body, angular_impulse, rotation)
+        corrected_y = self.config.ground_height + min_half_extent
+        body.position = (body.position[0], corrected_y, body.position[2])
+        normal = (0.0, 1.0, 0.0)
+        contact_offset = self._estimate_contact_offset(body, min_half_extent)
+
+        # Resolve normal impulse, accounting for angular effect from the contact lever arm.
+        contact_velocity = vec_add(body.velocity, vec_cross(body.angular_velocity, contact_offset))
+        normal_speed = vec_dot(contact_velocity, normal)
+        if normal_speed < 0.0:
+            r_cross_n = vec_cross(contact_offset, normal)
+            angular_term = vec_dot(vec_cross(self._apply_inverse_inertia(body, r_cross_n), contact_offset), normal)
+            impulse_denom = (1.0 / body.mass) + angular_term
+            if impulse_denom > 1e-6:
+                restitution = max(0.0, body.restitution)
+                jn = -(1.0 + restitution) * normal_speed / impulse_denom
+                impulse = vec_scale(normal, jn)
+                body.velocity = vec_add(body.velocity, vec_scale(impulse, 1.0 / body.mass))
+                body.angular_velocity = vec_add(
+                    body.angular_velocity,
+                    self._apply_inverse_inertia(body, vec_cross(contact_offset, impulse)),
+                )
+
+            contact_velocity = vec_add(body.velocity, vec_cross(body.angular_velocity, contact_offset))
+
+        # Clamp residual downward motion once the body is on the ground.
+        body.velocity = (body.velocity[0], max(body.velocity[1], 0.0), body.velocity[2])
+
+        # Apply ground support torque to influence angular velocity while in contact.
+        support_force_mag = max(0.0, -vec_dot(self.config.gravity, normal)) * body.mass
+        support_force = vec_scale(normal, support_force_mag)
+        support_torque = vec_cross(contact_offset, support_force)
+        angular_delta = self._apply_inverse_inertia(body, vec_scale(support_torque, self.config.dt))
         body.angular_velocity = vec_add(body.angular_velocity, angular_delta)
 
-    def _resolve_ground_contact(self, body: RigidBody) -> None:
-        normal = (0.0, 1.0, 0.0)
+    def _estimate_contact_offset(self, body: RigidBody, fallback_half_extent: float) -> Vector:
         rotation = quat_to_matrix(body.orientation)
         local_vertices = box_vertices(body.size)
-        contact_offset: Vector | None = None
-        lowest_world_y = float("inf")
+        world_vertices = [vec_add(mat3_mul_vec(rotation, vertex), body.position) for vertex in local_vertices]
+        min_height = min(vertex[1] for vertex in world_vertices)
+        threshold = min_height + 1e-4
+        accum = (0.0, 0.0, 0.0)
+        count = 0
+        for vertex in world_vertices:
+            if vertex[1] <= threshold:
+                accum = vec_add(accum, vertex)
+                count += 1
+        if count == 0:
+            return (0.0, -fallback_half_extent, 0.0)
+        contact_point = vec_scale(accum, 1.0 / count)
+        return vec_sub(contact_point, body.position)
 
-        for vertex in local_vertices:
-            world_offset = mat3_mul_vec(rotation, vertex)
-            world_y = body.position[1] + world_offset[1]
-            if world_y < lowest_world_y:
-                lowest_world_y = world_y
-                contact_offset = world_offset
-
-        if contact_offset is None:
-            return
-
-        penetration = self.config.ground_height - lowest_world_y
-        if penetration <= 0.0:
-            return
-
-        body.position = vec_add(body.position, (0.0, penetration, 0.0))
-
-        contact_velocity = vec_add(body.velocity, vec_cross(body.angular_velocity, contact_offset))
-        v_rel_n = vec_dot(contact_velocity, normal)
-        inv_mass = 1.0 / body.mass
-
-        j_n = 0.0
-        if v_rel_n < 0.0:
-            r_cross_n = vec_cross(contact_offset, normal)
-            inv_inertia_term = self._inverse_inertia_apply(body, r_cross_n, rotation)
-            denom = inv_mass + vec_dot(normal, vec_cross(inv_inertia_term, contact_offset))
-            if denom > 1e-8:
-                j_n = -(1.0 + body.restitution) * v_rel_n / denom
-                normal_impulse = vec_scale(normal, j_n)
-                self._apply_impulse(body, normal_impulse, contact_offset, rotation)
-
-        if j_n > 0.0:
-            updated_contact_velocity = vec_add(body.velocity, vec_cross(body.angular_velocity, contact_offset))
-            normal_component = vec_scale(normal, vec_dot(updated_contact_velocity, normal))
-            tangential_velocity = vec_sub(updated_contact_velocity, normal_component)
-            tangential_speed = vec_length(tangential_velocity)
-            if tangential_speed > 1e-5:
-                tangent_dir = vec_scale(tangential_velocity, 1.0 / tangential_speed)
-                r_cross_t = vec_cross(contact_offset, tangent_dir)
-                inv_inertia_t = self._inverse_inertia_apply(body, r_cross_t, rotation)
-                denom_t = inv_mass + vec_dot(tangent_dir, vec_cross(inv_inertia_t, contact_offset))
-                if denom_t > 1e-8:
-                    jt = -vec_dot(updated_contact_velocity, tangent_dir) / denom_t
-                    max_friction = self.config.ground_friction * j_n
-                    jt = max(-max_friction, min(jt, max_friction))
-                    friction_impulse = vec_scale(tangent_dir, jt)
-                    self._apply_impulse(body, friction_impulse, contact_offset, rotation)
+    def _apply_inverse_inertia(self, body: RigidBody, torque: Vector) -> Vector:
+        rotation = quat_to_matrix(body.orientation)
+        inertia = body.inertia_tensor_diag
+        torque_local = mat3_mul_vec_transpose(rotation, torque)
+        delta_local = (
+            torque_local[0] / inertia[0] if inertia[0] != 0.0 else 0.0,
+            torque_local[1] / inertia[1] if inertia[1] != 0.0 else 0.0,
+            torque_local[2] / inertia[2] if inertia[2] != 0.0 else 0.0,
+        )
+        return mat3_mul_vec(rotation, delta_local)
 
 
 def demo_scene() -> List[RigidBody]:
