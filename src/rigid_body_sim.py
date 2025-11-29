@@ -391,7 +391,7 @@ def main() -> None:
     config = SimulationConfig(duration=6.0, dt=1.0 / 120.0)
     sim = RigidBodySimulation(demo_scene(), config)
     sim.run()
-    output_dir = Path("output/obj_frames")
+    output_dir = Path("outputs/obj_frames")
     sim.export_obj_sequence(output_dir)
     print(f"Stored {len(sim.history)} OBJ frames under {output_dir}")
 
