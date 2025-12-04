@@ -12,8 +12,15 @@ config = {
     "particleRadius": 0.01,
     "numberOfStepsPerRenderUpdate": 1,
     "exportPly": True,
+    "plyOutputDir": "output/fluid/ply_output",  # Directory for exported PLY files
     "exportInterval": 42,  # steps per frame at 60 FPS (1/60 / 0.0004 ≈ 42)
     "maxFrames": 300,  # 5 seconds at 60 FPS
+    "exportImages": False,  # New option to export images
+    "imageOutputDir": "output/fluid/images",  # Directory for exported images
+    "imageInterval": 42,  # Same as exportInterval for consistency
+    "exportVideo": False,  # New option to export video and GIF
+    "videoFramerate": 24,  # Framerate for video
+    "videoOutputDir": "output/fluid/videos",  # Directory for video output
     "FluidBlocks": [
         {
             "objectId": 0,
@@ -45,19 +52,34 @@ if __name__ == "__main__":
     solver = WCSPHSolver(ps)
 
     export_ply_enabled = config.get("exportPly", False)
+    ply_output_dir = config.get("plyOutputDir", "ply_output")
     export_interval = config.get("exportInterval", 42)
     max_frames = config.get("maxFrames", 300)
     
+    export_images_enabled = config.get("exportImages", False)
+    image_output_dir = config.get("imageOutputDir", "images")
+    image_interval = config.get("imageInterval", 42)
+    
+    export_video_enabled = config.get("exportVideo", False)
+    video_framerate = config.get("videoFramerate", 24)
+    video_output_dir = config.get("videoOutputDir", "videos")
+    
     if export_ply_enabled:
-        output_dir = "ply_output"
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(ply_output_dir, exist_ok=True)
+    
+    if export_images_enabled:
+        os.makedirs(image_output_dir, exist_ok=True)
+    
+    if export_video_enabled:
+        os.makedirs(video_output_dir, exist_ok=True)
+        video_manager = ti.tools.VideoManager(output_dir=video_output_dir, framerate=video_framerate, automatic_build=False)
 
     window = ti.ui.Window('SPH', (1024, 1024), show_window=True, vsync=False)
     scene = ti.ui.Scene()
     camera = ti.ui.Camera()
-    camera.position(5.5, 2.5, 4.0)
+    camera.position(8.5, 2.5, 6.0)
     camera.up(0.0, 1.0, 0.0)
-    camera.lookat(-1.0, 0.0, 0.0)
+    camera.lookat(-1.0, 0.0, -0.6)
     camera.fov(70)
     scene.set_camera(camera)
 
@@ -81,6 +103,7 @@ if __name__ == "__main__":
 
     step_count = 0
     frame_count = 0
+    image_frame_count = 0
 
     while window.running:
         for i in range(config["numberOfStepsPerRenderUpdate"]):
@@ -89,10 +112,10 @@ if __name__ == "__main__":
             
             if export_ply_enabled and step_count % export_interval == 0:
                 if frame_count < max_frames:
-                    export_ply(ps, frame_count, output_dir)
-                    print(f"Exported frame {frame_count}")
+                    export_ply(ps, frame_count, ply_output_dir)
+                    print(f"Exported PLY frame {frame_count}")
                     frame_count += 1
-                    
+            
         ps.copy_to_vis_buffer()
 
         camera.track_user_inputs(window, movement_speed=movement_speed, hold_key=ti.ui.LMB)
@@ -105,5 +128,24 @@ if __name__ == "__main__":
 
         window.show()
         
-        if export_ply_enabled and frame_count >= max_frames:
+        # Export after rendering
+        if export_images_enabled and step_count % image_interval == 0:
+            if image_frame_count < max_frames:
+                img_array = window.get_image_buffer_as_numpy()
+                ti.tools.imwrite(img_array, os.path.join(image_output_dir, f"frame_{image_frame_count:04d}.png"))
+                print(f"Exported image frame {image_frame_count}")
+                image_frame_count += 1
+        
+        if export_video_enabled and step_count % image_interval == 0:
+            if image_frame_count <= max_frames:  # Allow one extra for video
+                img_array = window.get_image_buffer_as_numpy()
+                video_manager.write_frame(img_array)
+        
+        if (export_ply_enabled and frame_count >= max_frames) or (export_images_enabled and image_frame_count >= max_frames):
             break
+
+    if export_video_enabled:
+        print('Exporting .mp4 and .gif videos...')
+        video_manager.make_video(gif=True, mp4=True)
+        print(f'MP4 video is saved to {video_manager.get_output_filename(".mp4")}')
+        print(f'GIF video is saved to {video_manager.get_output_filename(".gif")}')
