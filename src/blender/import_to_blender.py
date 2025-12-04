@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import List
 
 # --- Configuration ---------------------------------------------------------
-MESH_DIRECTORY = Path("/home/cxy/Desktop/ACG/ACG-simulation/src/materials/fluid/mesh_output")
+MESH_DIRECTORY = Path("output/fluid/mesh_output")
 FILE_PATTERN = "*.obj"                        # Use "*.ply" for PLY files
 OBJECT_NAME = "FluidSurface"                  # Base name for animated meshes
 FRAME_START = 1                               # Timeline frame to start playback
