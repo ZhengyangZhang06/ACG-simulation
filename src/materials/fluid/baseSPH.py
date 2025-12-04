@@ -6,7 +6,7 @@ class SPHBase:
     def __init__(self, particle_system):
         self.ps = particle_system
         self.g = -9.81
-        self.viscosity = 0.05
+        self.viscosity = 0.01
         self.density_0 = 1000.0
         self.surface_tension = 0.01
         self.mass = self.ps.m_V * self.density_0
@@ -74,8 +74,10 @@ class SPHBase:
     def surface_tension_force(self, p_i, p_j, r_ij):
         r_norm = r_ij.norm()
         res = ti.Vector([0.0, 0.0, 0.0])
-        if r_norm > 1e-5:
-            res = -self.surface_tension * self.mass * self.cubic_kernel(r_norm) * r_ij / r_norm
+        if r_norm > self.ps.particle_diameter:
+            res -= self.surface_tension * self.ps.density[p_j] / self.ps.density[p_i] * self.cubic_kernel(r_norm) * r_ij
+        else:
+            res -= self.surface_tension * self.ps.density[p_j] / self.ps.density[p_i] * self.cubic_kernel(self.ps.particle_diameter) * r_ij
         return res
 
     def substep(self):
@@ -83,7 +85,7 @@ class SPHBase:
 
     @ti.func
     def simulate_collisions(self, p_i, vec, d):
-        c_f = 0.3
+        c_f = 0.5
         self.ps.x[p_i] += vec * d
         self.ps.v[p_i] -= (1.0 + c_f) * self.ps.v[p_i].dot(vec) * vec
 
