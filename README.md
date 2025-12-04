@@ -15,6 +15,12 @@ python -m src.rigid_body_sim
 
 The script produces `output/obj_frames/frame_0001.obj`, `frame_0002.obj`, … where every file encodes the full scene for one simulation step.
 
+### Loading custom meshes
+
+- Place a convex OBJ mesh under `assets/meshes` (or point to any other directory) and load it with `load_convex_mesh(Path("path/to/mesh.obj"))`.
+- Pass the resulting `MeshShape` to `RigidBody(shape=my_shape, size=None, ...)`. When `size` is omitted, the body derives its inertia from the mesh's bounding box.
+- The default `demo_scene()` automatically loads `assets/meshes/convex_gem.obj` so you can see a convex polyhedron colliding with the wooden crates.
+
 ## Blender visualization workflow
 
 1. **Run the simulator** so that `output/obj_frames` is populated with `frame_####.obj` files.

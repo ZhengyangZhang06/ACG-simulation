@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple, cast
+from typing import Dict, Iterable, List, Sequence, Tuple, cast
 import json
 import math
 Vector = Tuple[float, float, float]
@@ -134,13 +134,208 @@ def box_vertices(size: Vector) -> List[Vector]:
     ]
 
 
+def vec_normalize(v: Vector) -> Vector:
+    length = vec_length(v)
+    if length < 1e-9:
+        return (0.0, 0.0, 0.0)
+    inv = 1.0 / length
+    return (v[0] * inv, v[1] * inv, v[2] * inv)
+
+
+def _append_unique_axis(axes: List[Vector], axis: Vector, eps: float = 1e-5) -> None:
+    axis = vec_normalize(axis)
+    if axis == (0.0, 0.0, 0.0):
+        return
+    for existing in axes:
+        if abs(vec_dot(existing, axis)) >= 1.0 - eps:
+            return
+    axes.append(axis)
+
+
+def _zero_based_triangles(triangles: Sequence[Tuple[int, int, int]]) -> Tuple[Tuple[int, int, int], ...]:
+    converted: List[Tuple[int, int, int]] = []
+    for tri in triangles:
+        converted.append((tri[0] - 1, tri[1] - 1, tri[2] - 1))
+    return tuple(converted)
+
+
+class ConvexShape:
+    def __init__(self, vertices: Sequence[Vector], triangles: Sequence[Tuple[int, int, int]]):
+        if not vertices:
+            raise ValueError("ConvexShape requires at least one vertex")
+        if not triangles:
+            raise ValueError("ConvexShape requires face indices for SAT")
+        self._vertices: Tuple[Vector, ...] = tuple(vertices)
+        self._triangles: Tuple[Tuple[int, int, int], ...] = tuple(triangles)
+        self._face_normals: Tuple[Vector, ...] = self._compute_face_normals()
+        self._edge_dirs: Tuple[Vector, ...] = self._compute_edge_dirs()
+        self._bounding_radius: float = max(vec_length(v) for v in self._vertices)
+        mins = [min(vertex[i] for vertex in self._vertices) for i in range(3)]
+        maxs = [max(vertex[i] for vertex in self._vertices) for i in range(3)]
+        self._extents: Tuple[float, float, float] = tuple(max(maxs[i] - mins[i], 1e-4) for i in range(3))
+        self._min_half_extent = 0.5 * min(self._extents)
+
+    @property
+    def triangles(self) -> Tuple[Tuple[int, int, int], ...]:
+        return self._triangles
+
+    @property
+    def local_vertices(self) -> Tuple[Vector, ...]:
+        return self._vertices
+
+    @property
+    def local_face_normals(self) -> Tuple[Vector, ...]:
+        return self._face_normals
+
+    @property
+    def local_edge_dirs(self) -> Tuple[Vector, ...]:
+        return self._edge_dirs
+
+    def bounding_radius(self) -> float:
+        return self._bounding_radius
+
+    def min_half_extent(self) -> float:
+        return self._min_half_extent
+
+    def axis_aligned_extents(self) -> Tuple[float, float, float]:
+        return self._extents
+
+    def inertia_tensor_diag(self, mass: float) -> Vector:
+        # Approximate inertia using the axis-aligned bounding box dimensions.
+        w, h, d = self._extents
+        i_x = (1.0 / 12.0) * mass * (h * h + d * d)
+        i_y = (1.0 / 12.0) * mass * (w * w + d * d)
+        i_z = (1.0 / 12.0) * mass * (w * w + h * h)
+        return (i_x, i_y, i_z)
+
+    def support_point(self, orientation: Quaternion, position: Vector, direction: Vector) -> Vector:
+        rotation = quat_to_matrix(orientation)
+        return self.support_point_with_rotation(rotation, position, direction)
+
+    def support_point_with_rotation(self, rotation: Matrix3, position: Vector, direction: Vector) -> Vector:
+        direction_local = mat3_mul_vec_transpose(rotation, direction)
+        best_index = self._support_index_local(direction_local)
+        local_point = self._vertices[best_index]
+        return vec_add(mat3_mul_vec(rotation, local_point), position)
+
+    def world_vertices(self, rotation: Matrix3, position: Vector) -> List[Vector]:
+        return [vec_add(mat3_mul_vec(rotation, vertex), position) for vertex in self._vertices]
+
+    def world_face_normals(self, rotation: Matrix3) -> List[Vector]:
+        return [mat3_mul_vec(rotation, normal) for normal in self._face_normals]
+
+    def world_edge_dirs(self, rotation: Matrix3) -> List[Vector]:
+        return [mat3_mul_vec(rotation, edge) for edge in self._edge_dirs]
+
+    def _support_index_local(self, direction: Vector) -> int:
+        best_index = 0
+        best_dot = -math.inf
+        for idx, vertex in enumerate(self._vertices):
+            score = vec_dot(vertex, direction)
+            if score > best_dot:
+                best_dot = score
+                best_index = idx
+        return best_index
+
+    def _compute_face_normals(self) -> Tuple[Vector, ...]:
+        normals: List[Vector] = []
+        for tri in self._triangles:
+            a, b, c = tri
+            edge1 = vec_sub(self._vertices[b], self._vertices[a])
+            edge2 = vec_sub(self._vertices[c], self._vertices[a])
+            normal = vec_cross(edge1, edge2)
+            _append_unique_axis(normals, normal)
+        if not normals:
+            normals.extend([(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)])
+        return tuple(normals)
+
+    def _compute_edge_dirs(self) -> Tuple[Vector, ...]:
+        edges: List[Vector] = []
+        for tri in self._triangles:
+            a, b, c = tri
+            _append_unique_axis(edges, vec_sub(self._vertices[b], self._vertices[a]))
+            _append_unique_axis(edges, vec_sub(self._vertices[c], self._vertices[b]))
+            _append_unique_axis(edges, vec_sub(self._vertices[a], self._vertices[c]))
+        if not edges:
+            edges.extend([(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)])
+        return tuple(edges)
+
+
+class BoxShape(ConvexShape):
+    def __init__(self, size: Vector):
+        self.size = size
+        vertices = box_vertices(size)
+        zero_based = _zero_based_triangles(BOX_TRIANGLES)
+        super().__init__(vertices, zero_based)
+
+
+class MeshShape(ConvexShape):
+    def __init__(self, vertices: Sequence[Vector], triangles: Sequence[Tuple[int, int, int]]):
+        super().__init__(vertices, triangles)
+
+    @classmethod
+    def from_obj(
+        cls,
+        path: Path,
+        *,
+        scale: float = 1.0,
+        recenter: bool = True,
+    ) -> "MeshShape":
+        text = path.read_text().splitlines()
+        vertices: List[Vector] = []
+        triangles: List[Tuple[int, int, int]] = []
+        for line in text:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            parts = stripped.split()
+            if parts[0] == "v" and len(parts) >= 4:
+                x, y, z = map(float, parts[1:4])
+                vertices.append((x * scale, y * scale, z * scale))
+            elif parts[0] == "f" and len(parts) >= 4:
+                indices: List[int] = []
+                for token in parts[1:]:
+                    raw = token.split("/")[0]
+                    if not raw:
+                        continue
+                    idx = int(raw)
+                    if idx > 0:
+                        indices.append(idx - 1)
+                    else:
+                        indices.append(len(vertices) + idx)
+                if len(indices) < 3:
+                    continue
+                for i in range(1, len(indices) - 1):
+                    triangles.append((indices[0], indices[i], indices[i + 1]))
+        if not vertices:
+            raise ValueError(f"Mesh '{path}' does not contain vertices")
+        if not triangles:
+            raise ValueError(f"Mesh '{path}' does not contain faces")
+
+        if recenter:
+            count = float(len(vertices))
+            centroid = (
+                sum(v[0] for v in vertices) / count,
+                sum(v[1] for v in vertices) / count,
+                sum(v[2] for v in vertices) / count,
+            )
+            vertices = [vec_sub(v, centroid) for v in vertices]
+        return cls(vertices, triangles)
+
+
+def load_convex_mesh(path: Path, *, scale: float = 1.0, recenter: bool = True) -> MeshShape:
+    """Load a convex mesh from an OBJ file for use as a collision shape."""
+    return MeshShape.from_obj(path, scale=scale, recenter=recenter)
+
+
 @dataclass
 class RigidBody:
     name: str
     mass: float
-    size: Vector  # box dimensions (width, height, depth)
+    size: Vector | None  # Optional box dimensions
     position: Vector
     velocity: Vector
+    shape: ConvexShape | None = None
     orientation: Quaternion = (1.0, 0.0, 0.0, 0.0)
     angular_velocity: Vector = (0.0, 0.0, 0.0)
     restitution: float = 0.05
@@ -148,6 +343,14 @@ class RigidBody:
     angular_damping: float = 0.02
     forces: List[Vector] = field(default_factory=list)
     torques: List[Vector] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.shape is None:
+            if self.size is None:
+                raise ValueError("RigidBody requires either a size or an explicit shape")
+            self.shape = BoxShape(self.size)
+        elif self.size is None:
+            self.size = self.shape.axis_aligned_extents()
 
     def add_force(self, force: Vector) -> None:
         self.forces.append(force)
@@ -157,11 +360,8 @@ class RigidBody:
 
     @property
     def inertia_tensor_diag(self) -> Vector:
-        w, h, d = self.size
-        i_x = (1.0 / 12.0) * self.mass * (h * h + d * d)
-        i_y = (1.0 / 12.0) * self.mass * (w * w + d * d)
-        i_z = (1.0 / 12.0) * self.mass * (w * w + h * h)
-        return (i_x, i_y, i_z)
+        assert self.shape is not None
+        return self.shape.inertia_tensor_diag(self.mass)
 
     def clear_accumulators(self) -> None:
         self.forces.clear()
@@ -169,14 +369,14 @@ class RigidBody:
 
     @property
     def bounding_radius(self) -> float:
-        w, h, d = self.size
-        return 0.5 * math.sqrt(w * w + h * h + d * d)
+        assert self.shape is not None
+        return self.shape.bounding_radius()
 
 
 @dataclass
 class SimulationConfig:
     duration: float = 5.0
-    dt: float = 1.0 / 120.0
+    dt: float = 1.0 / 30.0
     gravity: Vector = (0.0, -9.81, 0.0)
     ground_height: float = 0.0
     ground_friction: float = 0.4
@@ -189,8 +389,12 @@ class RigidBodySimulation:
         self.config = config or SimulationConfig()
         self.time = 0.0
         self.history: List[Dict[str, object]] = []
-        self._body_sizes: Dict[str, Vector] = {body.name: body.size for body in self.bodies}
-        if len(self._body_sizes) != len(self.bodies):
+        self._body_shapes: Dict[str, ConvexShape] = {}
+        for body in self.bodies:
+            if body.shape is None:
+                raise ValueError(f"Body '{body.name}' is missing a collision shape")
+            self._body_shapes[body.name] = body.shape
+        if len(self._body_shapes) != len(self.bodies):
             raise ValueError("Rigid body names must be unique")
 
     def step(self) -> None:
@@ -257,21 +461,20 @@ class RigidBodySimulation:
             vertex_offset = 0
             for body_state in frame["bodies"]:
                 name = body_state["name"]  # type: ignore[index]
-                size = self._body_sizes.get(name)
-                if size is None:
+                shape = self._body_shapes.get(name)
+                if shape is None:
                     continue
                 orientation = cast(Quaternion, tuple(body_state["orientation"]))  # type: ignore[arg-type]
                 position = cast(Vector, tuple(body_state["position"]))  # type: ignore[arg-type]
                 rotation = quat_to_matrix(orientation)
-                local_vertices = box_vertices(size)
                 lines.append(f"g {name}")
-                transformed = [vec_add(mat3_mul_vec(rotation, vertex), position) for vertex in local_vertices]
+                transformed = shape.world_vertices(rotation, position)
                 for v in transformed:
                     lines.append(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}")
-                for tri in BOX_TRIANGLES:
-                    indices = [vertex_offset + idx for idx in tri]
+                for tri in shape.triangles:
+                    indices = [vertex_offset + idx + 1 for idx in tri]
                     lines.append("f " + " ".join(str(i) for i in indices))
-                vertex_offset += len(local_vertices)
+                vertex_offset += len(transformed)
 
             file_path = directory / f"{prefix}_{frame_idx:04d}.obj"
             file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -291,8 +494,9 @@ class RigidBodySimulation:
         self.history.append(frame_data)
 
     def _resolve_ground_contact(self, body: RigidBody) -> None:
+        assert body.shape is not None
         # Coarse bounding sphere check using the smallest half-extent.
-        min_half_extent = 0.5 * min(body.size)
+        min_half_extent = body.shape.min_half_extent()
         penetration = (body.position[1] - min_half_extent) - self.config.ground_height
         if penetration >= 0:
             return
@@ -332,9 +536,9 @@ class RigidBodySimulation:
         body.angular_velocity = vec_add(body.angular_velocity, angular_delta)
 
     def _estimate_contact_offset(self, body: RigidBody, fallback_half_extent: float) -> Vector:
+        assert body.shape is not None
         rotation = quat_to_matrix(body.orientation)
-        local_vertices = box_vertices(body.size)
-        world_vertices = [vec_add(mat3_mul_vec(rotation, vertex), body.position) for vertex in local_vertices]
+        world_vertices = body.shape.world_vertices(rotation, body.position)
         min_height = min(vertex[1] for vertex in world_vertices)
         threshold = min_height + 1e-4
         accum = (0.0, 0.0, 0.0)
@@ -367,12 +571,15 @@ class RigidBodySimulation:
             body_a = self.bodies[i]
             for j in range(i + 1, len(self.bodies)):
                 body_b = self.bodies[j]
-                collision = self._sat_test_boxes(body_a, body_b)
+                rotation_a = quat_to_matrix(body_a.orientation)
+                rotation_b = quat_to_matrix(body_b.orientation)
+                collision = self._sat_test_convex(body_a, body_b, rotation_a, rotation_b)
                 if collision is None:
                     continue
                 normal, penetration = collision
-                contact_point_a = self._support_point_on_box(body_a, normal)
-                contact_point_b = self._support_point_on_box(body_b, vec_scale(normal, -1.0))
+                assert body_a.shape is not None and body_b.shape is not None
+                contact_point_a = body_a.shape.support_point_with_rotation(rotation_a, body_a.position, normal)
+                contact_point_b = body_b.shape.support_point_with_rotation(rotation_b, body_b.position, vec_scale(normal, -1.0))
                 contact_offset_a = vec_sub(contact_point_a, body_a.position)
                 contact_offset_b = vec_sub(contact_point_b, body_b.position)
 
@@ -449,103 +656,55 @@ class RigidBodySimulation:
         body_a.position = vec_sub(body_a.position, vec_scale(correction, inv_mass_a))
         body_b.position = vec_add(body_b.position, vec_scale(correction, inv_mass_b))
 
-    def _support_point_on_box(self, body: RigidBody, direction: Vector) -> Vector:
-        direction_length = vec_length(direction)
-        if direction_length < 1e-6:
-            direction = (1.0, 0.0, 0.0)
-        rotation = quat_to_matrix(body.orientation)
-        dir_local = mat3_mul_vec_transpose(rotation, direction)
-        hx, hy, hz = body.size[0] * 0.5, body.size[1] * 0.5, body.size[2] * 0.5
-        local_point = (
-            hx if dir_local[0] >= 0.0 else -hx,
-            hy if dir_local[1] >= 0.0 else -hy,
-            hz if dir_local[2] >= 0.0 else -hz,
-        )
-        world_point = mat3_mul_vec(rotation, local_point)
-        return vec_add(world_point, body.position)
+    def _sat_test_convex(
+        self,
+        body_a: RigidBody,
+        body_b: RigidBody,
+        rotation_a: Matrix3,
+        rotation_b: Matrix3,
+    ) -> Tuple[Vector, float] | None:
+        if body_a.shape is None or body_b.shape is None:
+            return None
 
-    def _sat_test_boxes(self, body_a: RigidBody, body_b: RigidBody) -> Tuple[Vector, float] | None:
-        axes_a = self._body_axes(body_a)
-        axes_b = self._body_axes(body_b)
-        half_a = (body_a.size[0] * 0.5, body_a.size[1] * 0.5, body_a.size[2] * 0.5)
-        half_b = (body_b.size[0] * 0.5, body_b.size[1] * 0.5, body_b.size[2] * 0.5)
+        vertices_a = body_a.shape.world_vertices(rotation_a, body_a.position)
+        vertices_b = body_b.shape.world_vertices(rotation_b, body_b.position)
 
-        R = [[vec_dot(axes_a[i], axes_b[j]) for j in range(3)] for i in range(3)]
-        AbsR = [[abs(R[i][j]) + 1e-6 for j in range(3)] for i in range(3)]
+        axes: List[Vector] = []
+        axes.extend(body_a.shape.world_face_normals(rotation_a))
+        axes.extend(body_b.shape.world_face_normals(rotation_b))
+        for edge_a in body_a.shape.world_edge_dirs(rotation_a):
+            for edge_b in body_b.shape.world_edge_dirs(rotation_b):
+                axis = vec_cross(edge_a, edge_b)
+                if vec_length(axis) < 1e-6:
+                    continue
+                axes.append(vec_normalize(axis))
 
         translation = vec_sub(body_b.position, body_a.position)
-        t = [vec_dot(translation, axes_a[i]) for i in range(3)]
-
+        best_axis: Vector | None = None
         min_overlap = math.inf
-        best_axis = None
 
-        def try_axis(axis: Vector, overlap: float, direction_hint: float) -> None:
-            nonlocal min_overlap, best_axis
+        for axis in axes:
+            norm_axis = vec_normalize(axis)
+            if norm_axis == (0.0, 0.0, 0.0):
+                continue
+            min_a, max_a = _project_vertices(vertices_a, norm_axis)
+            min_b, max_b = _project_vertices(vertices_b, norm_axis)
+            overlap = min(max_a, max_b) - max(min_a, min_b)
+            if overlap <= 0.0:
+                return None
             if overlap < min_overlap:
-                axis_length = vec_length(axis)
-                if axis_length < 1e-6:
-                    return
-                sign = 1.0 if direction_hint >= 0.0 else -1.0
-                best_axis = vec_scale(axis, sign / axis_length)
+                direction_hint = vec_dot(norm_axis, translation)
+                best_axis = norm_axis if direction_hint >= 0.0 else vec_scale(norm_axis, -1.0)
                 min_overlap = overlap
-
-        # Axes from body A
-        for i in range(3):
-            ra = half_a[i]
-            rb = sum(half_b[j] * AbsR[i][j] for j in range(3))
-            distance = abs(t[i])
-            overlap = ra + rb - distance
-            if overlap < 0.0:
-                return None
-            try_axis(axes_a[i], overlap, t[i])
-
-        # Axes from body B
-        for j in range(3):
-            ra = sum(half_a[i] * AbsR[i][j] for i in range(3))
-            tb = vec_dot(translation, axes_b[j])
-            rb = half_b[j]
-            overlap = ra + rb - abs(tb)
-            if overlap < 0.0:
-                return None
-            try_axis(axes_b[j], overlap, tb)
-
-        # Axes from cross products
-        for i in range(3):
-            for j in range(3):
-                axis = vec_cross(axes_a[i], axes_b[j])
-                axis_length = vec_length(axis)
-                if axis_length < 1e-6:
-                    continue
-                ra = (
-                    half_a[(i + 1) % 3] * AbsR[(i + 2) % 3][j]
-                    + half_a[(i + 2) % 3] * AbsR[(i + 1) % 3][j]
-                )
-                rb = (
-                    half_b[(j + 1) % 3] * AbsR[i][(j + 2) % 3]
-                    + half_b[(j + 2) % 3] * AbsR[i][(j + 1) % 3]
-                )
-                distance = abs(
-                    t[(i + 2) % 3] * R[(i + 1) % 3][j]
-                    - t[(i + 1) % 3] * R[(i + 2) % 3][j]
-                )
-                overlap = ra + rb - distance
-                if overlap < 0.0:
-                    return None
-                direction_hint = vec_dot(axis, translation)
-                try_axis(axis, overlap, direction_hint)
 
         if best_axis is None or min_overlap is math.inf:
             return None
 
         return best_axis, min_overlap
 
-    def _body_axes(self, body: RigidBody) -> Tuple[Vector, Vector, Vector]:
-        rotation = quat_to_matrix(body.orientation)
-        return (
-            (rotation[0][0], rotation[1][0], rotation[2][0]),
-            (rotation[0][1], rotation[1][1], rotation[2][1]),
-            (rotation[0][2], rotation[1][2], rotation[2][2]),
-        )
+def _project_vertices(vertices: Sequence[Vector], axis: Vector) -> Tuple[float, float]:
+    projections = [vec_dot(vertex, axis) for vertex in vertices]
+    return min(projections), max(projections)
 
 
 def demo_scene() -> List[RigidBody]:
@@ -580,6 +739,22 @@ def demo_scene() -> List[RigidBody]:
             angular_velocity=(0.0, 1.8, 0.0),
         )
     )
+
+    mesh_path = Path("../assets/meshes/convex_gem.obj")
+    if mesh_path.exists():
+        gem_shape = load_convex_mesh(mesh_path, scale=0.75)
+        bodies.append(
+            RigidBody(
+                name="Gem",
+                mass=1.2,
+                size=None,
+                shape=gem_shape,
+                position=(-0.2, 5.0, -0.5),
+                velocity=(0.4, -0.2, 0.5),
+                angular_velocity=(0.8, 1.1, -0.3),
+                restitution=0.1,
+            )
+        )
     return bodies
 
 
