@@ -134,7 +134,7 @@ To efficiently find neighboring particles, we employ a uniform grid data structu
 \end{figure} 
 
 \subsection{Rendering Pipeline}
-We have successfully implemented the core pipeline components. The rendering pipeline features adjustable rendering with Principled BSDF materials for water effects, EEVEE engine with screen space reflections, and PNG output. Video creation uses ffmpeg to encode PNG sequences into MP4 videos with configurable settings.
+We have implemented a complete rendering pipeline using Blender. The pipeline imports reconstructed OBJ mesh sequences, applies Principled BSDF water materials with transparency, sets up lighting and camera, and renders animations. Output includes PNG sequences and MP4 videos generated via ffmpeg.
 
 \section{Plan for Remaining Technical Tasks}
 The remaining tasks focus on refinement and optimization. 
