@@ -14,3 +14,21 @@ src/output_new
 **/__pycache__/
 **/ply_output/
 **/mesh_output/
+
+# LaTeX
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.dvi
+*.ps
+*.nav
+*.snm
+*.vrb
