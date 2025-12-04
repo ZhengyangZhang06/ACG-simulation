@@ -17,8 +17,8 @@ import math
 from pathlib import Path
 
 # --- Configuration ---------------------------------------------------------
-INPUT_BLEND_FILE = Path("/home/cxy/Desktop/ACG/ACG-simulation/output/fluid_animation.blend")
-OUTPUT_DIR = Path("/home/cxy/Desktop/ACG/ACG-simulation/output/render")
+INPUT_BLEND_FILE = Path("output/fluid/fluid_animation.blend")
+OUTPUT_DIR = Path("output/fluid/render")
 
 # Render settings
 RESOLUTION_X = 1920
@@ -30,7 +30,7 @@ FRAME_START = None
 FRAME_END = None
 
 # Render engine: 'BLENDER_EEVEE', 'CYCLES', 'BLENDER_WORKBENCH'
-RENDER_ENGINE = 'BLENDER_EEVEE'
+RENDER_ENGINE = 'CYCLES'
 
 # Cycles-specific settings
 CYCLES_SAMPLES = 128
@@ -44,15 +44,18 @@ EEVEE_SAMPLES = 64
 # =============================================================================
 
 # Water material settings (Principled BSDF with transmission for realistic water)
-WATER_COLOR = (0.05, 0.25, 0.70, 1.0)     # RGBA: blue water
-WATER_ROUGHNESS = 0.03                    # 0 = smooth glass, 1 = rough
+# WATER_COLOR = (0.05, 0.25, 0.70, 1.0)     # RGBA: blue water
+WATER_COLOR = (0.0, 0.05, 0.5, 1.0)     # RGBA: deep blue water
+WATER_ROUGHNESS = 0.08                    # 0 = smooth glass, 1 = rough
 WATER_IOR = 1.333                         # Index of refraction (water = 1.333)
 WATER_TRANSMISSION = 1.0                  # 1.0 = fully refractive glass/water
 
 # Background color (RGBA)
 # BACKGROUND_COLOR = (0.05, 0.05, 0.1, 1.0)  # Dark blue
-BACKGROUND_COLOR = (1.0, 1.0, 1.0, 1.0)  # White
-BACKGROUND_STRENGTH = 3.0
+# BACKGROUND_COLOR = (1.0, 1.0, 1.0, 1.0)  # White
+# BACKGROUND_STRENGTH = 3.0
+BACKGROUND_COLOR = (0.05, 0.06, 0.1, 1.0)  # Dark blue
+BACKGROUND_STRENGTH = 1.0
 
 # Camera settings
 CAMERA_LOCATION = (11.617, -13.144, 9.127)      # (X, Y, Z)
@@ -90,8 +93,11 @@ def update_water_material() -> None:
     
     # Set water properties
     bsdf.inputs['Base Color'].default_value = WATER_COLOR
+    bsdf.inputs['Metallic'].default_value = 0.0  # Non-metallic for water
+    # Specular is set to default (usually 0.5) for water reflections
     bsdf.inputs['Roughness'].default_value = WATER_ROUGHNESS
     bsdf.inputs['IOR'].default_value = WATER_IOR
+    bsdf.inputs['Alpha'].default_value = 0.5  # Semi-transparent
     
     # Transmission property name changed in Blender 4.0+
     try:
@@ -101,6 +107,13 @@ def update_water_material() -> None:
             bsdf.inputs['Transmission'].default_value = WATER_TRANSMISSION
         except KeyError:
             pass
+    
+    # Set blend method for transparency
+    mat.blend_method = 'BLEND'
+    try:
+        mat.shadow_method = 'HASHED'
+    except AttributeError:
+        pass
     
     # Blend method for transparency
     try:

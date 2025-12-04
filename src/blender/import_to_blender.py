@@ -30,8 +30,8 @@ AXIS_FORWARD = "NEGATIVE_Z"
 AXIS_UP = "Y"
 
 # Output
-OUTPUT_BLEND_FILE = Path("/home/cxy/Desktop/ACG/ACG-simulation/output/fluid_animation.blend")
-OUTPUT_RENDER_DIR = Path("/home/cxy/Desktop/ACG/ACG-simulation/output/render")
+OUTPUT_BLEND_FILE = Path("output/fluid/fluid_animation.blend")
+OUTPUT_RENDER_DIR = Path("output/fluid/render")
 
 # Render settings
 RENDER_RESOLUTION_X = 1920
@@ -182,24 +182,18 @@ def setup_water_material() -> bpy.types.Material:
     output = nodes.new('ShaderNodeOutputMaterial')
     output.location = (400, 0)
     
-    # Use Glass BSDF for realistic water
-    glass = nodes.new('ShaderNodeBsdfGlass')
-    glass.location = (100, 0)
-    glass.inputs['Color'].default_value = (0.7, 0.85, 0.95, 1.0)
-    glass.inputs['Roughness'].default_value = 0.0
-    glass.inputs['IOR'].default_value = 1.33
+    # Use Principled BSDF for realistic water with transparency
+    bsdf = nodes.new('ShaderNodeBsdfPrincipled')
+    bsdf.location = (100, 0)
+    bsdf.inputs['Base Color'].default_value = (0.7, 0.85, 0.95, 1.0)  # Light blue
+    bsdf.inputs['Roughness'].default_value = 0.0
+    bsdf.inputs['IOR'].default_value = 1.33
+    bsdf.inputs['Alpha'].default_value = 0.5  # Semi-transparent
     
-    links.new(glass.outputs['BSDF'], output.inputs['Surface'])
+    links.new(bsdf.outputs['BSDF'], output.inputs['Surface'])
     
     # Render settings for transparency
-    try:
-        mat.blend_method = 'HASHED'
-        mat.shadow_method = 'HASHED'
-    except AttributeError:
-        try:
-            mat.blend_method = 'BLEND'
-        except AttributeError:
-            pass
+    mat.blend_method = 'BLEND'
     
     return mat
 
@@ -228,6 +222,12 @@ def setup_lighting() -> None:
     area.name = "AreaLight"
     area.data.energy = 500
     area.data.size = 5
+    
+    # Point light for additional illumination
+    bpy.ops.object.light_add(type='POINT', location=(0, 5, -6))
+    point = bpy.context.active_object
+    point.name = "PointLight"
+    point.data.energy = 2000
 
 
 def setup_camera() -> None:
@@ -256,13 +256,23 @@ def setup_world_background() -> None:
     
     # Background node
     background = nodes.new('ShaderNodeBackground')
-    background.location = (0, 0)
+    background.location = (200, 0)
     background.inputs['Color'].default_value = (0.05, 0.05, 0.1, 1.0)  # Dark blue
     background.inputs['Strength'].default_value = 1.0
     
+    # Optional: Add Environment Texture if HDR available
+    try:
+        env_texture = nodes.new('ShaderNodeTexEnvironment')
+        env_texture.location = (0, 0)
+        # Uncomment and set path if you have an HDR file
+        # env_texture.image = bpy.data.images.load('path/to/background.hdr')
+        # links.new(env_texture.outputs['Color'], background.inputs['Color'])
+    except Exception:
+        pass
+    
     # Output
     output = nodes.new('ShaderNodeOutputWorld')
-    output.location = (200, 0)
+    output.location = (400, 0)
     
     links.new(background.outputs['Background'], output.inputs['Surface'])
 

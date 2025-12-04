@@ -13,9 +13,9 @@ import sys
 from pathlib import Path
 
 # --- Configuration ---------------------------------------------------------
-INPUT_DIR = Path("/home/cxy/Desktop/ACG/ACG-simulation/output/render")
+INPUT_DIR = Path("output/fluid/render")
 INPUT_PATTERN = "frame_%04d.png"              # ffmpeg pattern for numbered frames
-OUTPUT_FILE = Path("/home/cxy/Desktop/ACG/ACG-simulation/output/fluid_animation.mp4")
+OUTPUT_FILE = Path("output/fluid/fluid_animation.mp4")
 
 # Video settings
 FPS = 60
