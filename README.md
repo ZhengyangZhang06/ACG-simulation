@@ -39,31 +39,31 @@ Feel free to tweak `demo_scene()` or create your own set of bodies to experiment
 ```bash
 python src/materials/fluid/run.py
 ```
-**Output:** `src/materials/fluid/ply_output/*.ply` (particle point clouds for each frame)
+**Output:** `output/fluid/ply_output/*.ply` (particle point clouds for each frame)
 
 ### Step 2: Surface Reconstruction
 ```bash
 python src/blender/reconstruct_surface.py
 ```
-**Output:** `src/materials/fluid/mesh_output/*.obj` (water surface meshes)
+**Output:** `output/fluid/mesh_output/*.obj` (water surface meshes)
 
 ### Step 3: Import to Blender
 ```bash
-~/Downloads/blender-5.0.0-linux-x64/blender --background --python /home/cxy/Desktop/ACG/ACG-simulation/src/blender/import_to_blender.py
+blender --background --python src/blender/import_to_blender.py
 ```
-**Output:** `output/fluid_animation.blend` (Blender project file with animated meshes)
+**Output:** `output/fluid/fluid_animation.blend` (Blender project file with animated meshes)
 
 ### Step 4: Render Animation
 ```bash
-~/Downloads/blender-5.0.0-linux-x64/blender -b /home/cxy/Desktop/ACG/ACG-simulation/output/fluid_animation.blend --python render_animation.py
+blender -b output/fluid/fluid_animation.blend --python src/blender/render_animation.py
 ```
-**Output:** `output/render/frame_XXXX.png` (rendered PNG image sequence)
+**Output:** `output/fluid/render/frame_XXXX.png` (rendered PNG image sequence)
 
 ### Step 5: Create Video
 ```bash
-python /home/cxy/Desktop/ACG/ACG-simulation/src/blender/create_video.py
+python src/blender/create_video.py
 ```
-**Output:** `output/fluid_animation.mp4` (final video)
+**Output:** `output/fluid/fluid_animation.mp4` (final video)
 
 ### References
 [SPH](https://dl.acm.org/doi/10.5555/846276.846298)
