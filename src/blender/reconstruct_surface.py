@@ -16,15 +16,15 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # --- Configuration ---------------------------------------------------------
-INPUT_DIR = Path("/home/cxy/Desktop/ACG/ACG-simulation/src/materials/fluid/ply_output")
-OUTPUT_DIR = Path("/home/cxy/Desktop/ACG/ACG-simulation/src/materials/fluid/mesh_output")
+INPUT_DIR = Path("output/fluid/ply_output")
+OUTPUT_DIR = Path("output/fluid/mesh_output")
 
 # Particle parameters (must match your simulation)
 PARTICLE_RADIUS = 0.01
 
 # Reconstruction parameters
 SMOOTHING_LENGTH = 2.0        # Smoothing kernel radius multiplier
-CUBE_SIZE = 1.5               # Grid cell size multiplier (smaller = finer mesh)
+CUBE_SIZE = 0.5               # Grid cell size multiplier (smaller = finer mesh)
 SURFACE_THRESHOLD = 0.6       # Density threshold for surface detection
 
 # Processing
@@ -35,25 +35,13 @@ NUM_WORKERS = 4               # Number of parallel workers (set to 1 for debuggi
 def reconstruct_single_frame(ply_path: Path, output_path: Path) -> str:
     """Reconstruct surface mesh from a single PLY particle file using splashsurf CLI."""
     try:
-        cmd = [
-            "splashsurf", "reconstruct",
-            str(ply_path),
-            "-o", str(output_path),
-            "-q",
-            f"--particle-radius={PARTICLE_RADIUS}",
-            f"--smoothing-length={SMOOTHING_LENGTH}",
-            f"--cube-size={CUBE_SIZE}",
-            f"--surface-threshold={SURFACE_THRESHOLD}",
-            "--subdomain-grid=on",
-            "--mesh-cleanup=on",
-            "--mesh-smoothing-weights=on",
-            "--mesh-smoothing-iters=25",
-            "--normals=on",
-            "--normals-smoothing-iters=10",
-        ]
+        command = "splashsurf reconstruct {} -o {} -q -r={} -l={} -c=0.5 -t=0.6 --subdomain-grid=on --mesh-cleanup=on --mesh-smoothing-weights=on --mesh-smoothing-iters=25 --normals=on --normals-smoothing-iters=10".format(
+            str(ply_path), str(output_path), PARTICLE_RADIUS, SMOOTHING_LENGTH
+        )
         
         result = subprocess.run(
-            cmd,
+            command,
+            shell=True,
             capture_output=True,
             text=True,
             timeout=300
