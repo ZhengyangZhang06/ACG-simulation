@@ -128,9 +128,8 @@ class SPHBase:
         pass
 
     @ti.func
-    def simulate_collisions(self, p_i, vec, d):
+    def simulate_collisions(self, p_i, vec):
         c_f = 0.5
-        self.ps.x[p_i] += vec * d
         self.ps.v[p_i] -= (1.0 + c_f) * self.ps.v[p_i].dot(vec) * vec
 
     @ti.kernel
@@ -138,67 +137,47 @@ class SPHBase:
         for p_i in range(self.ps.particle_num[None]):
             if self.ps.material[p_i] == particle_type and self.ps.is_dynamic[p_i]:
                 pos = self.ps.x[p_i]
-                collision_normal = ti.Vector([0.0, 0.0])
-                d = 0.0
+                
                 if pos[0] > self.ps.domain_size[0] - self.ps.padding:
-                    collision_normal[0] += 1.0
-                    d = pos[0] - (self.ps.domain_size[0] - self.ps.padding)
                     self.ps.x[p_i][0] = self.ps.domain_size[0] - self.ps.padding
-                if pos[0] <= self.ps.padding:
-                    collision_normal[0] += -1.0
-                    d = self.ps.padding - pos[0]
+                    self.simulate_collisions(p_i, ti.Vector([1.0, 0.0]))
+                if pos[0] < self.ps.padding:
                     self.ps.x[p_i][0] = self.ps.padding
+                    self.simulate_collisions(p_i, ti.Vector([-1.0, 0.0]))
 
                 if pos[1] > self.ps.domain_size[1] - self.ps.padding:
-                    collision_normal[1] += 1.0
-                    d = pos[1] - (self.ps.domain_size[1] - self.ps.padding)
                     self.ps.x[p_i][1] = self.ps.domain_size[1] - self.ps.padding
-                if pos[1] <= self.ps.padding:
-                    collision_normal[1] += -1.0
-                    d = self.ps.padding - pos[1]
+                    self.simulate_collisions(p_i, ti.Vector([0.0, 1.0]))
+                if pos[1] < self.ps.padding:
                     self.ps.x[p_i][1] = self.ps.padding
-
-                collision_normal_length = collision_normal.norm()
-                if collision_normal_length > 1e-6:
-                    self.simulate_collisions(p_i, collision_normal / collision_normal_length, d)
+                    self.simulate_collisions(p_i, ti.Vector([0.0, -1.0]))
 
     @ti.kernel
     def enforce_boundary_3D(self, particle_type: int):
         for p_i in range(self.ps.particle_num[None]):
             if self.ps.material[p_i] == particle_type and self.ps.is_dynamic[p_i]:
                 pos = self.ps.x[p_i]
-                collision_normal = ti.Vector([0.0, 0.0, 0.0])
-                d = 0.0
+                
                 if pos[0] > self.ps.domain_size[0] - self.ps.padding:
-                    collision_normal[0] += 1.0
-                    d = pos[0] - (self.ps.domain_size[0] - self.ps.padding)
                     self.ps.x[p_i][0] = self.ps.domain_size[0] - self.ps.padding
-                if pos[0] <= self.ps.padding:
-                    collision_normal[0] += -1.0
-                    d = self.ps.padding - pos[0]
+                    self.simulate_collisions(p_i, ti.Vector([1.0, 0.0, 0.0]))
+                if pos[0] < self.ps.padding:
                     self.ps.x[p_i][0] = self.ps.padding
+                    self.simulate_collisions(p_i, ti.Vector([-1.0, 0.0, 0.0]))
 
                 if pos[1] > self.ps.domain_size[1] - self.ps.padding:
-                    collision_normal[1] += 1.0
-                    d = pos[1] - (self.ps.domain_size[1] - self.ps.padding)
                     self.ps.x[p_i][1] = self.ps.domain_size[1] - self.ps.padding
-                if pos[1] <= self.ps.padding:
-                    collision_normal[1] += -1.0
-                    d = self.ps.padding - pos[1]
+                    self.simulate_collisions(p_i, ti.Vector([0.0, 1.0, 0.0]))
+                if pos[1] < self.ps.padding:
                     self.ps.x[p_i][1] = self.ps.padding
+                    self.simulate_collisions(p_i, ti.Vector([0.0, -1.0, 0.0]))
 
                 if pos[2] > self.ps.domain_size[2] - self.ps.padding:
-                    collision_normal[2] += 1.0
-                    d = pos[2] - (self.ps.domain_size[2] - self.ps.padding)
                     self.ps.x[p_i][2] = self.ps.domain_size[2] - self.ps.padding
-                if pos[2] <= self.ps.padding:
-                    collision_normal[2] += -1.0
-                    d = self.ps.padding - pos[2]
+                    self.simulate_collisions(p_i, ti.Vector([0.0, 0.0, 1.0]))
+                if pos[2] < self.ps.padding:
                     self.ps.x[p_i][2] = self.ps.padding
-
-                collision_normal_length = collision_normal.norm()
-                if collision_normal_length > 1e-6:
-                    self.simulate_collisions(p_i, collision_normal / collision_normal_length, d)
+                    self.simulate_collisions(p_i, ti.Vector([0.0, 0.0, -1.0]))
 
     @ti.func
     def compute_com(self, object_id):

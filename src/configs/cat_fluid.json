@@ -15,7 +15,7 @@
             "objectId": 0,
 			"geometryFile": "assets/meshes/cat.obj",
 			"translation": [1.8, 1.0, 1.8],
-			"scale": 0.004,
+			"scale": 0.003,
 			"velocity": [0.0, 0.0, 0.0],
 			"density": 1000.0,
 			"color": [50, 100, 200]
