@@ -79,29 +79,17 @@ python src/materials/fluid/run.py
 ```
 **Output:** `output/fluid/ply_output/*.ply` (particle point clouds for each frame), `output/fluid/images/*.png` (rendered images)
 
-### Step 2: Surface Reconstruction
+### Step 2: Surface Reconstruction, Import to Blender and Render Animation
 ```bash
-python src/blender/reconstruct_surface.py
+blender --background --python src/blender/render.py
 ```
-**Output:** `output/fluid/mesh_output/*.obj` (water surface meshes)
-
-### Step 3: Import to Blender
+To resume rendering from a specific OBJ index (useful for large sequences):
 ```bash
-blender --background --python src/blender/import_to_blender.py
-```
-**Output:** `output/fluid/fluid_animation.blend` (Blender project file with animated meshes)
-Or spilt into different batch
-```bash
-blender --background --python src/blender/import_to_blender.py --batch-index 5
-```
-
-### Step 4: Render Animation
-```bash
-blender --background --python src/blender/render_obj_to_video.py
+blender --background --python src/blender/render.py -- --start-obj 100
 ```
 **Output:** `output/fluid/render/frame_XXXX.png` (rendered PNG image sequence)
 
-### Step 5: Create Video
+### Step 3: Create Video
 ```bash
 python src/blender/create_video.py
 ```
