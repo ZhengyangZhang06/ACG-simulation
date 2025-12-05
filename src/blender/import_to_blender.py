@@ -13,8 +13,10 @@ Usage (in Blender):
 """
 from __future__ import annotations
 
+import argparse
 import bpy
 import math
+import sys
 from pathlib import Path
 from typing import List
 
@@ -30,7 +32,7 @@ AXIS_FORWARD = "NEGATIVE_Z"
 AXIS_UP = "Y"
 
 # Output
-OUTPUT_BLEND_FILE = Path("output/fluid/fluid_animation.blend")
+# OUTPUT_BLEND_FILE = Path("output/fluid/fluid_animation.blend")  # Removed, set per batch
 OUTPUT_RENDER_DIR = Path("output/fluid/render")
 
 # Render settings
@@ -120,7 +122,17 @@ def import_mesh(filepath: Path) -> bpy.types.Object:
 
 
 def clear_scene() -> None:
-    """Remove all mesh objects from scene."""
+    """Remove all mesh objects from scene, purge orphaned data, and reload default scene."""
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete(use_global=False)
+    
+    # Purge orphaned data to prevent memory accumulation
+    bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
+    
+    # Reload default scene to fully reset Blender state
+    bpy.ops.wm.read_homefile(use_empty=True)
+    
+    # Clear again in case default scene has objects
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
 
@@ -173,7 +185,7 @@ def import_mesh_sequence(frame_paths: List[Path]) -> List[bpy.types.Object]:
 def setup_water_material() -> bpy.types.Material:
     """Create a water material with proper settings for smooth rendering."""
     mat = bpy.data.materials.new(name="WaterMaterial")
-    mat.use_nodes = True
+    # mat.use_nodes = True  # Deprecated in Blender 6.0, nodes are always enabled
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
     
@@ -248,7 +260,7 @@ def setup_world_background() -> None:
         world = bpy.data.worlds.new("World")
         bpy.context.scene.world = world
     
-    world.use_nodes = True
+    # world.use_nodes = True  # Deprecated in Blender 6.0, nodes are always enabled
     nodes = world.node_tree.nodes
     links = world.node_tree.links
     
@@ -308,47 +320,107 @@ def setup_scene_settings(num_frames: int) -> None:
         pass
 
 
-def save_blend_file() -> None:
+def save_blend_file(filepath: Path) -> None:
     """Save the .blend file."""
-    OUTPUT_BLEND_FILE.parent.mkdir(parents=True, exist_ok=True)
-    bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT_BLEND_FILE))
-    print(f"Saved: {OUTPUT_BLEND_FILE}")
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    bpy.ops.wm.save_as_mainfile(filepath=str(filepath))
+    print(f"Saved: {filepath}")
 
 
 def main() -> None:
     """Main entry point."""
+    parser = argparse.ArgumentParser(description='Import mesh sequence to Blender')
+    parser.add_argument('--batch-index', type=int, help='Batch index to process (1-based, processes only that batch)')
+    args, unknown = parser.parse_known_args()  # Handle Blender's arguments
+    
     print("=" * 60)
     print("Import Mesh Sequence to Blender")
     print("=" * 60)
-    
-    # Clear existing scene
-    clear_scene()
     
     # Find mesh files
     frame_paths = resolve_frame_paths(MESH_DIRECTORY, FILE_PATTERN)
     print(f"Found {len(frame_paths)} mesh files in {MESH_DIRECTORY}")
     
-    # Import meshes with visibility animation
-    objects = import_mesh_sequence(frame_paths)
+    batch_size = 20
+    total_batches = (len(frame_paths) + batch_size - 1) // batch_size  # Ceiling division
     
-    # Apply material
-    material = setup_water_material()
-    apply_material_to_all(objects, material)
-    
-    # Setup scene
-    setup_lighting()
-    setup_camera()
-    setup_world_background()
-    setup_scene_settings(len(frame_paths))
-    
-    # Save
-    save_blend_file()
+    if args.batch_index is not None:
+        # Process only the specified batch
+        batch_idx = args.batch_index - 1
+        if batch_idx < 0 or batch_idx >= total_batches:
+            print(f"Error: batch-index {args.batch_index} is out of range (1-{total_batches})")
+            sys.exit(1)
+        
+        start_idx = batch_idx * batch_size
+        end_idx = min(start_idx + batch_size, len(frame_paths))
+        batch = frame_paths[start_idx:end_idx]
+        batch_num = batch_idx + 1
+        
+        print(f"Processing batch {batch_num}/{total_batches}: frames {start_idx+1} to {end_idx}")
+        
+        # Clear existing scene
+        clear_scene()
+        
+        # Import meshes with visibility animation
+        objects = import_mesh_sequence(batch)
+        
+        # Apply material
+        material = setup_water_material()
+        apply_material_to_all(objects, material)
+        
+        # Setup scene
+        setup_lighting()
+        setup_camera()
+        setup_world_background()
+        setup_scene_settings(len(batch))
+        
+        # Set output blend file for this batch
+        blend_filepath = Path(f"output/fluid/fluid_animation_{batch_num:03d}.blend")
+        
+        # Save
+        save_blend_file(blend_filepath)
+        
+        print(f"Saved batch {batch_num}: {blend_filepath}")
+    else:
+        # Process all batches (original behavior)
+        for batch_idx in range(total_batches):
+            start_idx = batch_idx * batch_size
+            end_idx = min(start_idx + batch_size, len(frame_paths))
+            batch = frame_paths[start_idx:end_idx]
+            batch_num = batch_idx + 1
+            
+            print(f"Processing batch {batch_num}/{total_batches}: frames {start_idx+1} to {end_idx}")
+            
+            # Clear existing scene for each batch
+            clear_scene()
+            
+            # Import meshes with visibility animation
+            objects = import_mesh_sequence(batch)
+            
+            # Apply material
+            material = setup_water_material()
+            apply_material_to_all(objects, material)
+            
+            # Setup scene
+            setup_lighting()
+            setup_camera()
+            setup_world_background()
+            setup_scene_settings(len(batch))
+            
+            # Set output blend file for this batch
+            blend_filepath = Path(f"output/fluid/fluid_animation_{batch_num:03d}.blend")
+            
+            # Save
+            save_blend_file(blend_filepath)
+            
+            print(f"Saved batch {batch_num}: {blend_filepath}")
     
     print("=" * 60)
-    print(f"Successfully imported {len(frame_paths)} frames")
-    print(f"Animation range: {FRAME_START} - {bpy.context.scene.frame_end}")
+    if args.batch_index is not None:
+        print(f"Successfully processed batch {args.batch_index}")
+    else:
+        print(f"Successfully processed {len(frame_paths)} frames in {total_batches} batches")
     print(f"FPS: {FPS}")
-    print(f"Blend file: {OUTPUT_BLEND_FILE}")
     print("=" * 60)
 
 

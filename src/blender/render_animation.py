@@ -13,6 +13,7 @@ Or render directly without this script:
 from __future__ import annotations
 
 import bpy
+import glob
 import math
 from pathlib import Path
 
@@ -78,7 +79,7 @@ def update_water_material() -> None:
     if mat is None:
         mat = bpy.data.materials.new(mat_name)
     
-    mat.use_nodes = True
+    # mat.use_nodes = True  # Deprecated in Blender 6.0, nodes are always enabled
     nodes = mat.node_tree.nodes
     
     # Get or create Principled BSDF
@@ -144,7 +145,7 @@ def update_background() -> None:
         world = bpy.data.worlds.new("World")
         bpy.context.scene.world = world
     
-    world.use_nodes = True
+    # world.use_nodes = True  # Deprecated in Blender 6.0, nodes are always enabled
     nodes = world.node_tree.nodes
     
     # Find or create background node
@@ -271,20 +272,45 @@ def render_animation() -> None:
 def main() -> None:
     """Main entry point."""
     print("=" * 60)
-    print("Updating scene parameters...")
+    print("Rendering Multiple Blend Files")
     print("=" * 60)
     
-    # Update all adjustable parameters
-    update_water_material()
-    update_background()
-    update_camera()
-    update_lighting()
+    blend_files = sorted(glob.glob("output/fluid/fluid_animation_*.blend"))
+    if not blend_files:
+        print("No blend files found in output/fluid/")
+        return
     
-    # Setup render settings
-    setup_render_settings()
+    print(f"Found {len(blend_files)} blend files to render")
     
-    # Render
-    render_animation()
+    for blend_file in blend_files:
+        batch_num = blend_file.split('_')[-1].split('.')[0]  # Extract batch number, e.g., '001'
+        print(f"\nRendering {blend_file} (batch {batch_num})")
+        print("-" * 40)
+        
+        # Open the blend file
+        bpy.ops.wm.open_mainfile(filepath=blend_file)
+        
+        # Update all adjustable parameters
+        update_water_material()
+        update_background()
+        update_camera()
+        update_lighting()
+        
+        # Setup render settings
+        setup_render_settings()
+        
+        # Modify output path to include batch number in filename
+        scene = bpy.context.scene
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        scene.render.filepath = f"output/fluid/render/frame_{batch_num}_"
+        
+        # Render
+        render_animation()
+    
+    print("=" * 60)
+    print("All batches rendered!")
+    print(f"Output saved to: {OUTPUT_DIR}")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
