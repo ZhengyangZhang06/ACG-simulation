@@ -6,7 +6,6 @@ src/output_new
 /taichi_sph
 /SPlisHSPlasH
 .DS_Store
-*.png
 *.mp4
 *.ini
 *.pyc
