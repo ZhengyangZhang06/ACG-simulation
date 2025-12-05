@@ -1,5 +1,6 @@
 import bpy
 import sys
+import argparse
 from pathlib import Path
 
 # --- Configuration ---------------------------------------------------------
@@ -160,11 +161,17 @@ def import_and_render_obj(obj_path: Path, frame_num: int) -> None:
     print(f"Rendered frame {frame_num}: {obj_path.name}")
 
 
-
 def main() -> None:
     """Main entry point."""
+    # Extract script arguments from sys.argv
+    script_args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    parser = argparse.ArgumentParser(description='Render OBJ sequence to images')
+    parser.add_argument('--start-obj', type=int, default=0, help='Start rendering from this OBJ index (0-based)')
+    args = parser.parse_args(script_args)
+
     print("=" * 60)
     print("Render OBJ Sequence to Images")
+    print(f"Starting from OBJ index: {args.start_obj}")
     print("=" * 60)
 
     # Find OBJ files
@@ -179,8 +186,8 @@ def main() -> None:
     clear_scene()
     setup_scene()
 
-    # Process each OBJ
-    for i, obj_path in enumerate(obj_files, 1):
+    # Process each OBJ starting from start_obj
+    for i, obj_path in enumerate(obj_files[args.start_obj:], args.start_obj + 1):
         print(f"Processing {i}/{len(obj_files)}: {obj_path.name}")
         import_and_render_obj(obj_path, i)
 
