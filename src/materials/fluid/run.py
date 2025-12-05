@@ -1,36 +1,12 @@
 import taichi as ti
 import numpy as np
 import os
+import argparse
+from config_builder import SimConfig
 from particle_system import ParticleSystem
 from WCSPH import WCSPHSolver
 
 ti.init(arch=ti.gpu, device_memory_fraction=0.5)
-
-config = {
-    "domainStart": [0.0, 0.0, 0.0],
-    "domainEnd": [5.0, 3.0, 2.0],
-    "particleRadius": 0.01,
-    "numberOfStepsPerRenderUpdate": 1,
-    "exportPly": True,
-    "plyOutputDir": "output/fluid/ply_output",  # Directory for exported PLY files
-    "exportInterval": 42,  # steps per frame at 60 FPS (1/60 / 0.0004 ≈ 42)
-    "maxFrames": 300,  # 5 seconds at 60 FPS
-    "exportImages": True,  # New option to export images
-    "imageOutputDir": "output/fluid/images",  # Directory for exported images
-    "imageInterval": 42,  # Same as exportInterval for consistency
-    "FluidBlocks": [
-        {
-            "objectId": 0,
-            "start": [0.1, 0.1, 0.5],
-            "end": [1.2, 2.9, 1.6],
-            "translation": [0.2, 0.0, 0.2],
-            "scale": [1, 1, 1],
-            "velocity": [0.0, -1.0, 0.0],
-            "density": 1000.0,
-            "color": [50, 100, 200]
-        }
-    ]
-}
 
 def export_ply(ps, frame, output_dir):
     num_particles = ps.particle_num[None]
@@ -45,17 +21,26 @@ def export_ply(ps, frame, output_dir):
     writer.export_frame_ascii(frame, series_prefix)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='SPH Taichi')
+    parser.add_argument('--scene_file',
+                        default='',
+                        help='scene file')
+    args = parser.parse_args()
+    scene_path = args.scene_file
+    config = SimConfig(scene_file_path=scene_path)
+    scene_name = scene_path.split("/")[-1].split(".")[0]
     ps = ParticleSystem(config)
     solver = WCSPHSolver(ps)
+    solver.initialize()
 
-    export_ply_enabled = config.get("exportPly", False)
-    ply_output_dir = config.get("plyOutputDir", "ply_output")
-    export_interval = config.get("exportInterval", 42)
-    max_frames = config.get("maxFrames", 300)
+    export_ply_enabled = config.get_cfg("exportPly", False)
+    ply_output_dir = f"output/fluid/{scene_name}/ply_output"
+    export_interval = 42  # steps per frame at 60 FPS (1/60 / 0.0004 ≈ 42)
+    max_frames = 300  # 5 seconds at 60 FPS
     
-    export_images_enabled = config.get("exportImages", False)
-    image_output_dir = config.get("imageOutputDir", "images")
-    image_interval = config.get("imageInterval", 42)
+    export_images_enabled = config.get_cfg("exportImages", False)
+    image_output_dir = f"output/fluid/{scene_name}/images"
+    image_interval = 42
     
     show_window = not export_images_enabled
     
@@ -68,16 +53,18 @@ if __name__ == "__main__":
     window = ti.ui.Window('SPH', (1024, 1024), show_window=show_window, vsync=False)
     scene = ti.ui.Scene()
     camera = ti.ui.Camera()
-    camera.position(8.0, 2.5, 6.0)
+    cam_pos = config.get_cfg("cameraPosition") or [8.0, 2.5, 6.0]
+    cam_lookat = config.get_cfg("cameraLookat") or [-1.0, 0.0, -2.2]
+    camera.position(*cam_pos)
     camera.up(0.0, 1.0, 0.0)
-    camera.lookat(-1.0, 0.0, -2.2)
+    camera.lookat(*cam_lookat)
     camera.fov(70)
     scene.set_camera(camera)
 
     canvas = window.get_canvas()
     movement_speed = 0.02
 
-    x_max, y_max, z_max = config["domainEnd"]
+    x_max, y_max, z_max = config.get_cfg("domainEnd")
     box_anchors = ti.Vector.field(3, dtype=ti.f32, shape=8)
     box_anchors[0] = ti.Vector([0.0, 0.0, 0.0])
     box_anchors[1] = ti.Vector([0.0, y_max, 0.0])
@@ -97,7 +84,7 @@ if __name__ == "__main__":
     image_frame_count = 0
 
     while window.running:
-        for i in range(config["numberOfStepsPerRenderUpdate"]):
+        for i in range(config.get_cfg("numberOfStepsPerRenderUpdate") or 1):
             solver.step()
             step_count += 1
             

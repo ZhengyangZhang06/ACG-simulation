@@ -46,6 +46,8 @@ conda activate acg
 Install Taichi (tested with version 1.7.4):
 ```bash
 pip install taichi==1.7.4
+pip install trimesh
+pip install scipy
 ```
 Install Rust and splashsurf for surface reconstruction:
 ```bash
@@ -75,7 +77,7 @@ blender --version
 
 ### Step 1: Run Fluid Simulation
 ```bash
-python src/materials/fluid/run.py
+ python src/materials/fluid/run.py --scene src/configs/basic_fluid.json 
 ```
 **Output:** `output/fluid/ply_output/*.ply` (particle point clouds for each frame), `output/fluid/images/*.png` (rendered images)
 
@@ -105,3 +107,5 @@ python src/blender/create_video.py
 [DFSPH](https://dl.acm.org/doi/10.1145/2786784.2786796)
 
 [rigid-fluid Coupling](https://dl.acm.org/doi/10.1145/2185520.2185558)
+
+[SPH_Taichi](https://github.com/erizmr/SPH_Taichi)
