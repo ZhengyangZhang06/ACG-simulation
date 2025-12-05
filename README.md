@@ -33,33 +33,63 @@ Each OBJ contains named groups (`CrateA`, `CrateB`, `CrateC`, …), so you can a
 Feel free to tweak `demo_scene()` or create your own set of bodies to experiment with different scenarios.
 # ACG-simulation
 
+## Environment Setup
+
+### Conda Environment
+Create and activate a conda environment with the required Python version:
+```bash
+conda create -n acg python=3.11
+conda activate acg
+```
+
+### Dependencies
+Install Taichi (tested with version 1.7.4):
+```bash
+pip install taichi==1.7.4
+```
+Install Rust and splashsurf for surface reconstruction:
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+cargo install splashsurf
+```
+
+### Blender
+Download and install Blender 5.0 from the [official website](https://www.blender.org/download/). Ensure `blender` is in your PATH.
+
+Alternatively, download via command line:
+```bash
+# Download Blender 5.0.0 (adjust version as needed)
+wget https://download.blender.org/release/Blender5.0/blender-5.0.0-linux-x64.tar.xz
+tar -xf blender-5.0.0-linux-x64.tar.xz
+export PATH=$PWD/blender-5.0.0-linux-x64:$PATH
+```
+
+Test the setup:
+```bash
+python -c "import taichi as ti; print('Taichi version:', ti.__version__)"
+blender --version
+```
+
 ## Usage
 
 ### Step 1: Run Fluid Simulation
 ```bash
 python src/materials/fluid/run.py
 ```
-**Output:** `output/fluid/ply_output/*.ply` (particle point clouds for each frame)
+**Output:** `output/fluid/ply_output/*.ply` (particle point clouds for each frame), `output/fluid/images/*.png` (rendered images)
 
-### Step 2: Surface Reconstruction
+### Step 2: Surface Reconstruction, Import to Blender and Render Animation
 ```bash
-python src/blender/reconstruct_surface.py
+blender --background --python src/blender/render.py
 ```
-**Output:** `output/fluid/mesh_output/*.obj` (water surface meshes)
-
-### Step 3: Import to Blender
+To resume rendering from a specific OBJ index (useful for large sequences):
 ```bash
-blender --background --python src/blender/import_to_blender.py
-```
-**Output:** `output/fluid/fluid_animation.blend` (Blender project file with animated meshes)
-
-### Step 4: Render Animation
-```bash
-blender -b output/fluid/fluid_animation.blend --python src/blender/render_animation.py
+blender --background --python src/blender/render.py -- --start-obj 100
 ```
 **Output:** `output/fluid/render/frame_XXXX.png` (rendered PNG image sequence)
 
-### Step 5: Create Video
+### Step 3: Create Video
 ```bash
 python src/blender/create_video.py
 ```
