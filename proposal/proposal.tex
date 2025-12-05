@@ -32,7 +32,7 @@
 }
 
 \author{Zhengyang Zhang}
-\email{zhangzy24@mail.tsinghua.edu.cn}
+\email{zzy24@mail.tsinghua.edu.cn}
 \affiliation{%
   \institution{IIIS, Tsinghua University}
   \city{Beijing}
@@ -84,7 +84,26 @@ The technical points of our project include:
 
 \section{Methods Completed}
 \subsection{Rigid Body}
+We have implemented a rigid body dynamics simulator in raw Python, focusing on compact, self-contained math and clear data structures. Each body stores mass, position, linear velocity, orientation (quaternion), and angular velocity. Forces and torques are accumulated per time step and integrated with a semi-implicit Euler scheme. Gravity is applied as a constant force. Linear damping and angular damping are included to stabilize motion.
+
+Orientation is advanced by integrating angular velocity via quaternion updates. We use axis–angle increments constructed from the current angular speed and normalize quaternions for numerical robustness. The inertia tensor is approximated per-shape using the axis-aligned extents to provide diagonal moments consistent with box-like solids.
+
+Collision shapes are convex and represented by either parametric boxes or meshes loaded from OBJ files. For meshes, we parse `v` and `f` records, optionally recenter to the centroid, and store triangles and vertices for downstream collision queries. We export simulation frames to OBJ sequences, transforming each body's local vertices by its current orientation and position for rendering.
 \subsection{Collision Handling}
+We employ a Separating Axis Test (SAT) for convex–convex collision detection. Candidate axes include face normals from both shapes and all pairwise cross products of shape edge directions. For each axis, we project both bodies’ world-space vertices and measure interval overlap; a separating axis implies no collision. The contact normal is chosen as the axis with minimal positive overlap, oriented along the bodies’ relative translation.
+
+Ground contact is handled with a simple but effective scheme. We estimate the lowest support point using transformed vertices and clamp penetration against a flat plane at a configurable height. A normal impulse is applied when the contact point is moving into the plane faster than a small threshold, incorporating both linear and angular contributions via lever arms and inverse inertia. Residual downward velocity is clamped once resting contact is established, and a support-torque term nudges angular velocity toward stable ground interaction.
+
+For body–body response, we compute the relative velocity at the contact points (including rotational components), and apply a restitution-scaled impulse along the contact normal. The impulse denominator includes inverse masses and angular terms derived from lever arms and inverse inertia in local space, transformed back to world space. To correct interpenetration, we add a positional correction along the normal using a fraction of the measured penetration with a small slop to avoid jitter. Restitution and friction-style stabilization are controlled via configuration parameters.
+
+Here is an example of simulation results
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.45\textwidth]{figures/rigid1.png}
+\hfill
+\includegraphics[width=0.45\textwidth]{figures/rigid2.png}
+\caption{Rigid body simulation frames, we can see that both simple boxes and complex mesh (bunny in the picture) is supported. Also there are interation between different rigid bodies or between rigid body and ground, no penetration is observed.}
+\end{figure}
 \subsection{Fluid}
 We have implemented a basic WCSPH fluid simulator using the Taichi programming language. The simulator supports essential SPH operations such as density and pressure computation, viscosity and surface tension forces, and time integration. We have also integrated the SplashSurf library to reconstruct fluid surfaces from particle data for rendering.
 
