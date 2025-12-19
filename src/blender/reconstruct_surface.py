@@ -16,8 +16,8 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # --- Configuration ---------------------------------------------------------
-INPUT_DIR = Path("output/fluid/ply_output")
-OUTPUT_DIR = Path("output/fluid/mesh_output")
+INPUT_DIR = Path("output/fluid/dragon_bath/ply_output")
+OUTPUT_DIR = Path("output/fluid/dragon_bath/mesh_output")
 
 # Particle parameters (must match your simulation)
 PARTICLE_RADIUS = 0.01

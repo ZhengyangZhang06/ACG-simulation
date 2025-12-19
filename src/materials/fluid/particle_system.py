@@ -164,6 +164,12 @@ class ParticleSystem:
         offset = np.array(body.get("translation", [0, 0, 0]))
         mesh.vertices += offset
         
+        # Backup the original mesh for exporting obj
+        mesh_backup = mesh.copy()
+        body["mesh"] = mesh_backup
+        body["restPosition"] = mesh_backup.vertices.copy()
+        body["restCenterOfMass"] = mesh_backup.vertices.mean(axis=0)
+        
         voxelized_mesh = mesh.voxelized(pitch=self.particle_diameter).fill()
         return voxelized_mesh.points
 

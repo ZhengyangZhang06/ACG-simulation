@@ -63,6 +63,10 @@ CAMERA_LOCATION = (11.617, -13.144, 9.127)      # (X, Y, Z)
 CAMERA_ROTATION = (1.05, 0, 0.64)         # (X, Y, Z) in radians
 CAMERA_LENS = 47                          # Focal length in mm
 
+# CAMERA_LOCATION = (10, -13.144, 9.127)
+# CAMERA_ROTATION = (1.05, 0, 0.64)
+# CAMERA_LENS = 50
+
 # Lighting settings
 SUN_ENERGY = 5.0
 SUN_ROTATION = (0.785, 0, 0.785)         # 45 degrees

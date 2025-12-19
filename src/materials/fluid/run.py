@@ -8,17 +8,39 @@ from WCSPH import WCSPHSolver
 
 ti.init(arch=ti.gpu, device_memory_fraction=0.5)
 
-def export_ply(ps, frame, output_dir):
+def export_ply(ps, frame, output_dir, obj_id=0):
     num_particles = ps.particle_num[None]
-    np_pos = ps.x.to_numpy()[:num_particles]
-    np_color = ps.color.to_numpy()[:num_particles]
+    np_object_id = ps.object_id.to_numpy()[:num_particles]
+    mask = (np_object_id == obj_id)
     
-    writer = ti.tools.PLYWriter(num_vertices=num_particles)
+    np_pos = ps.x.to_numpy()[:num_particles][mask]
+    np_color = ps.color.to_numpy()[:num_particles][mask]
+    
+    num_obj_particles = np_pos.shape[0]
+    if num_obj_particles == 0:
+        return
+    
+    writer = ti.tools.PLYWriter(num_vertices=num_obj_particles)
     writer.add_vertex_pos(np_pos[:, 0], np_pos[:, 1], np_pos[:, 2])
     writer.add_vertex_color(np_color[:, 0], np_color[:, 1], np_color[:, 2])
     
     series_prefix = os.path.join(output_dir, "fluid.ply")
     writer.export_frame_ascii(frame, series_prefix)
+
+def export_obj(ps, frame, output_dir, obj_id):
+    if obj_id not in ps.object_collection:
+        return
+    obj_data = ps.object_collection[obj_id]
+    if "mesh" not in obj_data:
+        return
+    
+    obj_dir = os.path.join(output_dir, f"obj_{obj_id}")
+    os.makedirs(obj_dir, exist_ok=True)
+    
+    obj_path = os.path.join(obj_dir, f"obj_{obj_id}_{frame:06d}.obj")
+    with open(obj_path, "w") as f:
+        e = obj_data["mesh"].export(file_type='obj')
+        f.write(e)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SPH Taichi')
@@ -35,8 +57,11 @@ if __name__ == "__main__":
 
     export_ply_enabled = config.get_cfg("exportPly", False)
     ply_output_dir = f"output/fluid/{scene_name}/ply_output"
-    export_interval = 42  # steps per frame at 60 FPS (1/60 / 0.0004 ≈ 42)
-    max_frames = 300  # 5 seconds at 60 FPS
+    export_interval = 42
+    max_frames = 300
+    
+    export_obj_enabled = config.get_cfg("exportObj", False)
+    obj_output_dir = f"output/fluid/{scene_name}/mesh_output"
     
     export_images_enabled = config.get_cfg("exportImages", False)
     image_output_dir = f"output/fluid/{scene_name}/images"
@@ -46,6 +71,9 @@ if __name__ == "__main__":
     
     if export_ply_enabled:
         os.makedirs(ply_output_dir, exist_ok=True)
+    
+    if export_obj_enabled:
+        os.makedirs(obj_output_dir, exist_ok=True)
     
     if export_images_enabled:
         os.makedirs(image_output_dir, exist_ok=True)
@@ -88,10 +116,16 @@ if __name__ == "__main__":
             solver.step()
             step_count += 1
             
-            if export_ply_enabled and step_count % export_interval == 0:
+            if (export_ply_enabled or export_obj_enabled) and step_count % export_interval == 0:
                 if frame_count < max_frames:
-                    export_ply(ps, frame_count, ply_output_dir)
-                    print(f"Exported PLY frame {frame_count}")
+                    if export_ply_enabled:
+                        export_ply(ps, frame_count, ply_output_dir, obj_id=0)
+                        print(f"Exported PLY frame {frame_count}")
+                    if export_obj_enabled:
+                        for r_body_id in ps.object_id_rigid_body:
+                            export_obj(ps, frame_count, obj_output_dir, r_body_id)
+                        if len(ps.object_id_rigid_body) > 0:
+                            print(f"Exported OBJ frame {frame_count}")
                     frame_count += 1
             
         ps.copy_to_vis_buffer()
@@ -115,7 +149,7 @@ if __name__ == "__main__":
                 print(f"Exported image frame {image_frame_count}")
                 image_frame_count += 1
         
-        if (export_ply_enabled and frame_count >= max_frames) or (export_images_enabled and image_frame_count >= max_frames):
+        if ((export_ply_enabled or export_obj_enabled) and frame_count >= max_frames) or (export_images_enabled and image_frame_count >= max_frames):
             break
 
     print(f"Simulation Finished")

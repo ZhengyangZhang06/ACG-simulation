@@ -13,9 +13,9 @@ import sys
 from pathlib import Path
 
 # --- Configuration ---------------------------------------------------------
-INPUT_DIR = Path("output/fluid/render")
+INPUT_DIR = Path("output/fluid/dragon_bath/render")  # Directory containing PNG frames
 INPUT_PATTERN = "frame_%04d.png"              # ffmpeg pattern for numbered frames
-OUTPUT_FILE = Path("output/fluid/fluid_animation.mp4")
+OUTPUT_FILE = Path("output/fluid/dragon_bath/fluid_animation.mp4")
 
 # Video settings
 FPS = 60
