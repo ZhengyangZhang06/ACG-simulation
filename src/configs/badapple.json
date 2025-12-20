@@ -20,7 +20,9 @@
         "appleDisplaceWeight": 40.0,
         "appleTestParams": [0.99, 1.0, 0.0, 0.1],
         "wallForceDst": 0.3,
-        "wallForceStr": 3.0
+        "wallForceStr": 3.0,
+        "mouseInteractionRadius": 2.0,
+        "mouseInteractionStrength": 50000.0
 	},
 	"FluidBlocks": [
 		{

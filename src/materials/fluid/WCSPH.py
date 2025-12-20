@@ -12,6 +12,13 @@ class WCSPHSolver(SPHBase):
         self.config = config
         self.is_bad_apple = config.get_cfg("isBadApple", False)
         
+        # Mouse interaction parameters
+        self.mouse_pos = ti.Vector.field(2, dtype=ti.f32, shape=())
+        self.mouse_pos[None] = [0.0, 0.0]
+        self.mouse_strength = ti.field(dtype=ti.f32, shape=())
+        self.mouse_strength[None] = 0.0
+        self.mouse_radius = config.get_cfg("mouseInteractionRadius", 0.5)
+        
         # Initialize bad apple fields
         self.bad_apple_enabled = ti.field(dtype=ti.i32, shape=())
         self.bad_apple_enabled[None] = 1 if self.is_bad_apple else 0
@@ -155,6 +162,28 @@ class WCSPHSolver(SPHBase):
                 continue
             d_v = ti.Vector([0.0 for _ in range(self.ps.dim)])
             d_v[1] = self.g
+            
+            # Mouse interaction force
+            if self.ps.material[p_i] == self.ps.material_fluid and ti.abs(self.mouse_strength[None]) > 0.001:
+                x_i = self.ps.x[p_i]
+                mouse_offset = self.mouse_pos[None] - x_i[:2]
+                sqr_dst = mouse_offset.dot(mouse_offset)
+                radius_sq = self.mouse_radius * self.mouse_radius
+                
+                if sqr_dst < radius_sq:
+                    dst = ti.sqrt(sqr_dst)
+                    edge_t = dst / self.mouse_radius
+                    centre_t = 1.0 - edge_t
+                    dir_to_centre = mouse_offset / ti.max(dst, 0.001)
+                    
+                    # Modify gravity based on mouse interaction
+                    gravity_weight = 1.0 - (centre_t * ti.max(0.0, ti.min(1.0, ti.abs(self.mouse_strength[None]) / 10.0)))
+                    mouse_accel = dir_to_centre * centre_t * self.mouse_strength[None]
+                    velocity_damp = -self.ps.v[p_i][:2] * centre_t
+                    
+                    d_v[1] *= gravity_weight
+                    d_v[:2] += mouse_accel + velocity_damp
+            
             # Apply bad apple force if enabled
             if self.bad_apple_enabled[None] == 1 and self.ps.material[p_i] == self.ps.material_fluid:
                 x_i = self.ps.x[p_i]
@@ -241,6 +270,15 @@ class WCSPHSolver(SPHBase):
                 self.ps.v[p_i] += self.dt[None] * self.ps.acceleration[p_i]
                 self.ps.x[p_i] += self.dt[None] * self.ps.v[p_i]
 
+    def update_mouse_interaction(self, mouse_x, mouse_y, strength):
+        """Update mouse interaction parameters
+        Args:
+            mouse_x, mouse_y: Mouse position in world coordinates
+            strength: Interaction strength (positive = attract, negative = repel, 0 = none)
+        """
+        self.mouse_pos[None] = [mouse_x, mouse_y]
+        self.mouse_strength[None] = strength
+    
     def update_frame(self):
         """Update to next video frame (called once per render frame)"""
         if self.is_bad_apple:

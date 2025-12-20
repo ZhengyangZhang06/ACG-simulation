@@ -128,11 +128,38 @@ if __name__ == "__main__":
     step_count = 0
     frame_count = 0
     image_frame_count = 0
+    
+    # Mouse interaction settings
+    mouse_interaction_strength = config.get_cfg("mouseInteractionStrength", 100.0)
 
     while window.running:
         # Update video frame once per render frame (before physics steps)
         if hasattr(solver, 'update_frame'):
             solver.update_frame()
+        
+        # Handle mouse interaction
+        if show_window and hasattr(solver, 'update_mouse_interaction'):
+            mouse_pos = window.get_cursor_pos()
+            # For 2D simulation, map screen coordinates to world XY plane
+            # Assuming camera looks at XY plane from Z direction
+            if dim == 2:
+                world_x = mouse_pos[0] * x_max
+                world_y = mouse_pos[1] * y_max
+            else:
+                # For 3D, use XY plane at Z=0
+                world_x = mouse_pos[0] * x_max
+                world_y = mouse_pos[1] * y_max
+            
+            # Check mouse buttons (note: camera now uses MMB)
+            strength = 0.0
+            if window.is_pressed(ti.ui.LMB):  # Left mouse button = attract
+                strength = mouse_interaction_strength
+                print(f"Mouse attract at ({world_x:.2f}, {world_y:.2f}), strength={strength}")
+            elif window.is_pressed(ti.ui.RMB):  # Right mouse button = repel
+                strength = -mouse_interaction_strength
+                print(f"Mouse repel at ({world_x:.2f}, {world_y:.2f}), strength={strength}")
+            
+            solver.update_mouse_interaction(world_x, world_y, strength)
         
         for i in range(config.get_cfg("numberOfStepsPerRenderUpdate") or 1):
             solver.step()
@@ -153,7 +180,7 @@ if __name__ == "__main__":
         ps.copy_to_vis_buffer()
 
         if show_window:
-            camera.track_user_inputs(window, movement_speed=movement_speed, hold_key=ti.ui.LMB)
+            camera.track_user_inputs(window, movement_speed=movement_speed, hold_key=ti.ui.MMB)
         scene.set_camera(camera)
 
         scene.point_light((2.0, 2.0, 2.0), color=(1.0, 1.0, 1.0))
