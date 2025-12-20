@@ -55,7 +55,7 @@ if __name__ == "__main__":
     config = SimConfig(scene_file_path=scene_path)
     scene_name = scene_path.split("/")[-1].split(".")[0]
     ps = ParticleSystem(config)
-    solver = WCSPHSolver(ps)
+    solver = WCSPHSolver(ps, config)
     solver.initialize()
 
     export_ply_enabled = config.get_cfg("exportPly", False)
@@ -130,6 +130,10 @@ if __name__ == "__main__":
     image_frame_count = 0
 
     while window.running:
+        # Update video frame once per render frame (before physics steps)
+        if hasattr(solver, 'update_frame'):
+            solver.update_frame()
+        
         for i in range(config.get_cfg("numberOfStepsPerRenderUpdate") or 1):
             solver.step()
             step_count += 1
