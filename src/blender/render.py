@@ -19,15 +19,18 @@ BACKGROUND_COLOR = (1.0, 1.0, 1.0, 1.0)
 BACKGROUND_STRENGTH = 2.0
 
 # Camera
-CAMERA_LOCATION = (11.617, -13.144, 7.2)
-CAMERA_ROTATION = (1.2, 0, 0.64)
-CAMERA_LENS = 60
+# CAMERA_LOCATION = (11.617, -13.144, 7.2)
+# CAMERA_ROTATION = (1.2, 0, 0.64)
+# CAMERA_LENS = 60
+CAMERA_LOCATION = (10, -13.144, 9.127)
+CAMERA_ROTATION = (1.05, 0, 0.64)
+CAMERA_LENS = 50
 
 # Materials
 WATER_MATERIAL_NAME = "Sea Water.001"
 WATER_MATERIAL_FILE = "assets/materials/water2.blend"
-METAL_MATERIAL_NAME = "Metal"
-METAL_MATERIAL_FILE = "assets/materials/metal.blend"
+METAL_MATERIAL_NAME = "Plastic"
+METAL_MATERIAL_FILE = "assets/materials/plastic.blend"
 # ---------------------------------------------------------------------------
 
 

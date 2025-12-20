@@ -9,17 +9,22 @@ class SPHBase:
         self.viscosity = 0.01
         self.density_0 = 1000.0
         self.surface_tension = 0.01
-        self.mass = self.ps.m_V * self.density_0
         self.dt = ti.field(float, shape=())
-        self.dt[None] = 0.0004
+        self.dt[None] = 0.0001
         self.h = self.ps.h
 
     @ti.func
     def cubic_kernel(self, r_norm):
         res = ti.cast(0.0, ti.f32)
         h = self.h
-        k = 8.0 / np.pi
-        k /= h ** 3
+        k = 1.0
+        if self.ps.dim == 1:
+            k = 4 / 3
+        elif self.ps.dim == 2:
+            k = 40 / 7 / np.pi
+        elif self.ps.dim == 3:
+            k = 8 / np.pi
+        k /= h ** self.ps.dim
         q = r_norm / h
         if q <= 1.0:
             if q <= 0.5:
@@ -33,8 +38,14 @@ class SPHBase:
     @ti.func
     def cubic_kernel_derivative(self, r):
         h = self.h
-        k = 8.0 / np.pi
-        k = 6.0 * k / h ** 3
+        k = 1.0
+        if self.ps.dim == 1:
+            k = 4 / 3
+        elif self.ps.dim == 2:
+            k = 40 / 7 / np.pi
+        elif self.ps.dim == 3:
+            k = 8 / np.pi
+        k = 6. * k / h ** self.ps.dim
         r_norm = r.norm()
         q = r_norm / h
         res = ti.Vector([0.0 for _ in range(self.ps.dim)])
@@ -57,9 +68,10 @@ class SPHBase:
         return force
 
     @ti.func
-    def viscosity_force(self, p_i, p_j, r_ij):
-        v = (self.ps.v[p_i] - self.ps.v[p_j]).dot(r_ij)
-        res = 2 * (self.ps.dim + 2) * self.viscosity * (self.mass / self.ps.density[p_j]) * v / (r_ij.norm()**2 + 0.01 * self.h**2) * self.cubic_kernel_derivative(r_ij)
+    def viscosity_force(self, p_i, p_j, r):
+        v_xy = (self.ps.v[p_i] - self.ps.v[p_j]).dot(r)
+        res = 2 * (self.ps.dim + 2) * self.viscosity * (self.ps.m[p_j] / self.ps.density[p_j]) * v_xy / (
+            r.norm()**2 + 0.01 * self.h**2) * self.cubic_kernel_derivative(r)
         return res
 
     @ti.func
@@ -219,10 +231,19 @@ class SPHBase:
         return R
 
     def solve_rigid_body(self):
-        for r_obj_id in self.ps.object_id_rigid_body:
-            if self.ps.object_collection[r_obj_id].get("isDynamic", False):
-                self.solve_constraints(r_obj_id)
-                self.enforce_boundary_3D(self.ps.material_solid)
+        for i in range(1):
+            for r_obj_id in self.ps.object_id_rigid_body:
+                if self.ps.object_collection[r_obj_id]["isDynamic"]:
+                    R = self.solve_constraints(r_obj_id)
+
+                    if self.ps.cfg.get_cfg("exportObj"):
+                        # For output obj only: update the mesh
+                        cm = self.compute_com_kernel(r_obj_id)
+                        ret = R.to_numpy() @ (self.ps.object_collection[r_obj_id]["restPosition"] - self.ps.object_collection[r_obj_id]["restCenterOfMass"]).T
+                        self.ps.object_collection[r_obj_id]["mesh"].vertices = cm.to_numpy() + ret.T
+
+                    # self.compute_rigid_collision()
+                    self.enforce_boundary_3D(self.ps.material_solid)
 
     def step(self):
         self.ps.initialize_particle_system()

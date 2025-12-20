@@ -40,7 +40,10 @@ def export_obj(ps, frame, output_dir, obj_id):
     obj_path = os.path.join(obj_dir, f"obj_{obj_id}_{frame:06d}.obj")
     with open(obj_path, "w") as f:
         e = obj_data["mesh"].export(file_type='obj')
-        f.write(e)
+        # Remove material references to avoid MTL file errors
+        lines = e.split('\n')
+        filtered_lines = [line for line in lines if not line.startswith(('mtllib', 'usemtl'))]
+        f.write('\n'.join(filtered_lines))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SPH Taichi')
@@ -57,7 +60,7 @@ if __name__ == "__main__":
 
     export_ply_enabled = config.get_cfg("exportPly", False)
     ply_output_dir = f"output/fluid/{scene_name}/ply_output"
-    export_interval = 42
+    export_interval = 168
     max_frames = 300
     
     export_obj_enabled = config.get_cfg("exportObj", False)
@@ -65,7 +68,7 @@ if __name__ == "__main__":
     
     export_images_enabled = config.get_cfg("exportImages", False)
     image_output_dir = f"output/fluid/{scene_name}/images"
-    image_interval = 42
+    image_interval = 168
     
     show_window = not export_images_enabled
     

@@ -95,7 +95,7 @@ blender --background --python src/blender/render.py
 ```
 To resume rendering from a specific OBJ index (useful for large sequences):
 ```bash
-blender --background --python src/blender/render.py -- --start-obj 100
+blender --background --python src/blender/render.py -- --scene cat_dynamic --start-obj 100
 ```
 **Output:** `output/fluid/render/frame_XXXX.png` (rendered PNG image sequence)
 

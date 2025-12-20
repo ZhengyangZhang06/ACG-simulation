@@ -19,7 +19,7 @@ class ParticleSystem:
         self.particle_radius = self.cfg.get_cfg("particleRadius")
         self.particle_diameter = 2 * self.particle_radius
         self.h = self.particle_radius * 4.0
-        self.m_V = 0.8 * self.particle_diameter ** self.dim
+        self.m_V0 = 0.8 * self.particle_diameter ** self.dim
         self.grid_size = self.h
         self.grid_num = np.ceil(self.domain_size / self.grid_size).astype(int)
         self.particle_max_num_per_cell = 100
@@ -64,19 +64,21 @@ class ParticleSystem:
 
         # Particle fields
         self.x = ti.Vector.field(self.dim, dtype=float, shape=self.particle_max_num)
-        self.x_0 = ti.Vector.field(self.dim, dtype=float, shape=self.particle_max_num)  # Rest position
+        self.x_0 = ti.Vector.field(self.dim, dtype=float, shape=self.particle_max_num)
         self.v = ti.Vector.field(self.dim, dtype=float, shape=self.particle_max_num)
+        self.acceleration = ti.Vector.field(self.dim, dtype=float, shape=self.particle_max_num)
         self.density = ti.field(dtype=float, shape=self.particle_max_num)
         self.pressure = ti.field(dtype=float, shape=self.particle_max_num)
+        self.m_V = ti.field(dtype=float, shape=self.particle_max_num)
+        self.m = ti.field(dtype=float, shape=self.particle_max_num)
         self.material = ti.field(dtype=int, shape=self.particle_max_num)
         self.is_dynamic = ti.field(dtype=int, shape=self.particle_max_num)
         self.object_id = ti.field(dtype=int, shape=self.particle_max_num)
         self.color = ti.Vector.field(3, dtype=float, shape=self.particle_max_num)
         
         # Rigid body fields
-        self.m_V0 = self.m_V  # Rest volume
         self.padding = self.particle_radius
-        num_rigid_bodies = len(rigid_bodies) + 10  # Extra buffer
+        num_rigid_bodies = len(rigid_bodies) + 10
         self.rigid_rest_cm = ti.Vector.field(self.dim, dtype=float, shape=num_rigid_bodies)
         
         # Boundary volume for fluid-solid coupling
@@ -199,10 +201,13 @@ class ParticleSystem:
         for i in range(num_new):
             p = offset + i
             self.x[p] = positions[i]
-            self.x_0[p] = positions[i]  # Store rest position
+            self.x_0[p] = positions[i]
             self.v[p] = velocity
+            self.acceleration[p] = ti.Vector([0.0 for _ in range(self.dim)])
             self.density[p] = density
             self.pressure[p] = 0.0
+            self.m_V[p] = self.m_V0
+            self.m[p] = self.m_V0 * density
             self.material[p] = material
             self.is_dynamic[p] = is_dynamic
             self.object_id[p] = object_id
