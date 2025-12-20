@@ -219,7 +219,10 @@ class SPHBase:
                         self.ps.object_collection[r_obj_id]["mesh"].vertices = cm.to_numpy() + ret.T
 
                     # self.compute_rigid_collision()
-                    self.enforce_boundary_3D(self.ps.material_solid)
+                    if self.ps.dim == 2:
+                        self.enforce_boundary_2D(self.ps.material_solid)
+                    else:
+                        self.enforce_boundary_3D(self.ps.material_solid)
 
     def step(self):
         self.ps.initialize_particle_system()

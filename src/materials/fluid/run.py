@@ -61,7 +61,7 @@ if __name__ == "__main__":
     export_ply_enabled = config.get_cfg("exportPly", False)
     ply_output_dir = f"output/fluid/{scene_name}/ply_output"
     export_interval = 168
-    max_frames = 300
+    max_frames = 200
     
     export_obj_enabled = config.get_cfg("exportObj", False)
     obj_output_dir = f"output/fluid/{scene_name}/mesh_output"
@@ -95,20 +95,35 @@ if __name__ == "__main__":
     canvas = window.get_canvas()
     movement_speed = 0.02
 
-    x_max, y_max, z_max = config.get_cfg("domainEnd")
-    box_anchors = ti.Vector.field(3, dtype=ti.f32, shape=8)
-    box_anchors[0] = ti.Vector([0.0, 0.0, 0.0])
-    box_anchors[1] = ti.Vector([0.0, y_max, 0.0])
-    box_anchors[2] = ti.Vector([x_max, 0.0, 0.0])
-    box_anchors[3] = ti.Vector([x_max, y_max, 0.0])
-    box_anchors[4] = ti.Vector([0.0, 0.0, z_max])
-    box_anchors[5] = ti.Vector([0.0, y_max, z_max])
-    box_anchors[6] = ti.Vector([x_max, 0.0, z_max])
-    box_anchors[7] = ti.Vector([x_max, y_max, z_max])
-
-    box_lines_indices = ti.field(int, shape=(2 * 12))
-    for i, val in enumerate([0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 0, 4, 1, 5, 2, 6, 3, 7]):
-        box_lines_indices[i] = val
+    domain_end = config.get_cfg("domainEnd")
+    dim = len(domain_end)
+    if dim == 2:
+        x_max, y_max = domain_end
+        z_max = 0.0
+        box_anchors = ti.Vector.field(3, dtype=ti.f32, shape=4)
+        box_anchors[0] = ti.Vector([0.0, 0.0, 0.0])
+        box_anchors[1] = ti.Vector([0.0, y_max, 0.0])
+        box_anchors[2] = ti.Vector([x_max, 0.0, 0.0])
+        box_anchors[3] = ti.Vector([x_max, y_max, 0.0])
+        box_lines_indices = ti.field(int, shape=(2 * 4))
+        for i, val in enumerate([0, 1, 0, 2, 1, 3, 2, 3]):
+            box_lines_indices[i] = val
+    elif dim == 3:
+        x_max, y_max, z_max = domain_end
+        box_anchors = ti.Vector.field(3, dtype=ti.f32, shape=8)
+        box_anchors[0] = ti.Vector([0.0, 0.0, 0.0])
+        box_anchors[1] = ti.Vector([0.0, y_max, 0.0])
+        box_anchors[2] = ti.Vector([x_max, 0.0, 0.0])
+        box_anchors[3] = ti.Vector([x_max, y_max, 0.0])
+        box_anchors[4] = ti.Vector([0.0, 0.0, z_max])
+        box_anchors[5] = ti.Vector([0.0, y_max, z_max])
+        box_anchors[6] = ti.Vector([x_max, 0.0, z_max])
+        box_anchors[7] = ti.Vector([x_max, y_max, z_max])
+        box_lines_indices = ti.field(int, shape=(2 * 12))
+        for i, val in enumerate([0, 1, 0, 2, 1, 3, 2, 3, 4, 5, 4, 6, 5, 7, 6, 7, 0, 4, 1, 5, 2, 6, 3, 7]):
+            box_lines_indices[i] = val
+    else:
+        raise ValueError("domainEnd must have 2 or 3 elements")
 
     step_count = 0
     frame_count = 0

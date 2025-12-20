@@ -14,8 +14,8 @@
 	"FluidBlocks": [
 		{
             "objectId": 0,
-			"start": [0.01, 0.01, 0.01],
-			"end": [1.99, 0.8, 1.99],
+			"start": [0.00, 0.00, 0.00],
+			"end": [2.00, 0.8, 2.00],
 			"translation": [0.0, 0.0, 0.0],
 			"scale": [1, 1, 1],
 			"velocity": [0.0, 0.0, 0.0],
@@ -27,12 +27,12 @@
 		{
             "objectId": 1,
 			"geometryFile": "assets/meshes/cat.obj",
-			"translation": [1.0, 1.5, 1.5],
+			"translation": [1.0, 1.5, 1.2],
 			"rotationAxis": [0, 1, 0],
 			"rotationAngle": 180,
 			"scale": 0.0015,
-			"velocity": [0.0, -5.0, 0.0],
-			"density": 400.0,
+			"velocity": [0.0, -10.0, 0.0],
+			"density": 700.0,
 			"color": [255, 100, 50], 
 			"isDynamic": true
 		}
