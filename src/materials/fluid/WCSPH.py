@@ -38,6 +38,7 @@ class WCSPHSolver(SPHBase):
             self.apple_weight = config.get_cfg("appleWeight")
             self.apple_displace_weight = config.get_cfg("appleDisplaceWeight")
             self.apple_test_params = config.get_cfg("appleTestParams")
+            self.apple_spread_strength = config.get_cfg("appleSpreadStrength", 2.0)  # Force to spread particles in white regions
             self.wall_force_dst = config.get_cfg("wallForceDst", 0.5)
             self.wall_force_str = config.get_cfg("wallForceStr", 50.0)
             frames_path = config.get_cfg("badAppleFramesPath")
@@ -206,16 +207,43 @@ class WCSPHSolver(SPHBase):
                 
                 # HLSL: float2 offset = data.xy - pixelCoord;
                 offset = data[:2] - pixel_coord.cast(float)
-                # HLSL: bool valid = dot(data.xy,data.xy) > 0 && dot(offset,offset)>0;
-                valid = data[:2].dot(data[:2]) > 0 and offset.dot(offset) > 0
+                has_nearest = data[:2].dot(data[:2]) > 0.01
+                offset_len_sq = offset.dot(offset)
+                jfa_distance = data[2]  # Distance in pixels to nearest white pixel
                 
-                # HLSL: float2 dir = valid ? normalize(offset) : 0;
+                # Convert JFA pixel distance to world distance
+                pixels_per_world_unit = tex_size[0] / bounds_size[0]  # Assuming uniform scaling
+                world_distance = jfa_distance / pixels_per_world_unit
+                
                 dir_normalized = ti.Vector([0.0, 0.0])
-                if valid:
-                    dir_normalized = offset.normalized()
+                force_multiplier = 1.0
+                
+                if has_nearest:
+                    if world_distance > 0.5:  # Far from white region (in black region)
+                        # Strong attraction toward white region
+                        if offset_len_sq > 0.0001:
+                            dir_normalized = offset.normalized()
+                            force_multiplier = 1.0
+                    elif world_distance > 0.05:  # Approaching white region
+                        # Moderate attraction
+                        if offset_len_sq > 0.0001:
+                            dir_normalized = offset.normalized()
+                            force_multiplier = world_distance  # Reduce as getting closer
+                    else:  # Inside or very close to white region (world_distance < 0.05)
+                        # Spread particles: push away from boundary
+                        if offset_len_sq > 0.0001:
+                            # Push in opposite direction of boundary
+                            dir_normalized = -offset.normalized()
+                            # Stronger push when closer to boundary
+                            force_multiplier = self.apple_spread_strength * (1.0 - world_distance / 0.05)
+                        else:
+                            # On a white pixel, use pseudo-random spread
+                            angle = p_i * 2.618
+                            dir_normalized = ti.Vector([ti.cos(angle), ti.sin(angle)])
+                            force_multiplier = self.apple_spread_strength * 0.5
                 
                 # HLSL: gravityAccel += dir * appleForce;
-                apple_force = self.apple_weight
+                apple_force = self.apple_weight * force_multiplier
                 d_v += dir_normalized * apple_force
                 # HLSL: Positions[index] += dir * deltaTime * appleDisplaceWeight;
                 displace = dir_normalized * self.dt[None] * self.apple_displace_weight
@@ -269,6 +297,64 @@ class WCSPHSolver(SPHBase):
             if self.ps.is_dynamic[p_i]:
                 self.ps.v[p_i] += self.dt[None] * self.ps.acceleration[p_i]
                 self.ps.x[p_i] += self.dt[None] * self.ps.v[p_i]
+    
+    @ti.kernel
+    def check_and_respawn_particles(self):
+        """Check for invalid particles and respawn them"""
+        domain_start = ti.Vector(self.ps.domain_start[:2])
+        domain_end = ti.Vector(self.ps.domain_end[:2])
+        
+        for p_i in range(self.ps.particle_num[None]):
+            if self.ps.material[p_i] != self.ps.material_fluid:
+                continue
+            
+            pos = self.ps.x[p_i][:2]
+            vel = self.ps.v[p_i][:2]
+            
+            # Check for invalid position (NaN, Inf, or out of bounds)
+            is_invalid = False
+            
+            # Check NaN/Inf
+            if ti.math.isnan(pos[0]) or ti.math.isnan(pos[1]) or ti.math.isinf(pos[0]) or ti.math.isinf(pos[1]):
+                is_invalid = True
+            if ti.math.isnan(vel[0]) or ti.math.isnan(vel[1]) or ti.math.isinf(vel[0]) or ti.math.isinf(vel[1]):
+                is_invalid = True
+            
+            # Check out of bounds (with large margin)
+            margin = 1.0
+            if pos[0] < domain_start[0] - margin or pos[0] > domain_end[0] + margin:
+                is_invalid = True
+            if pos[1] < domain_start[1] - margin or pos[1] > domain_end[1] + margin:
+                is_invalid = True
+            
+            # Check excessive velocity
+            vel_mag_sq = vel.dot(vel)
+            if vel_mag_sq > 10000.0:  # Speed > 100
+                is_invalid = True
+            
+            # Respawn if invalid
+            if is_invalid:
+                # Random position in domain
+                hash_val = (p_i * ti.u32(2654435761)) % 1000000
+                rand_x = (hash_val % 1000) / 1000.0
+                rand_y = ((hash_val // 1000) % 1000) / 1000.0
+                
+                # Spawn in center region with some spread
+                center = (domain_start + domain_end) / 2
+                spread = (domain_end - domain_start) * 0.5
+                new_pos = center + (ti.Vector([rand_x, rand_y]) - 0.5) * 2.0 * spread
+                
+                # Random velocity (small)
+                angle = rand_x * 6.28318  # 2*pi
+                speed = rand_y * 2.0
+                new_vel = ti.Vector([ti.cos(angle), ti.sin(angle)]) * speed
+                
+                self.ps.x[p_i][:2] = new_pos
+                if self.ps.dim == 3:
+                    self.ps.x[p_i][2] = (domain_start[0] + domain_end[0]) / 2  # Center Z
+                self.ps.v[p_i][:2] = new_vel
+                if self.ps.dim == 3:
+                    self.ps.v[p_i][2] = 0.0
 
     def update_mouse_interaction(self, mouse_x, mouse_y, strength):
         """Update mouse interaction parameters
@@ -306,3 +392,4 @@ class WCSPHSolver(SPHBase):
         self.compute_pressure_forces()
         self.compute_non_pressure_forces()
         self.advect()
+        self.check_and_respawn_particles()

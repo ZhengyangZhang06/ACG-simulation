@@ -16,11 +16,12 @@
         "badAppleFrameInterval": 100,
         "badAppleLoopVideo": true,
         "numFrames": 800,
-        "appleWeight": 3.0,
-        "appleDisplaceWeight": 40.0,
+        "appleWeight": 5.0,
+        "appleDisplaceWeight": 30.0,
+        "appleSpreadStrength": 10.0,
         "appleTestParams": [0.99, 1.0, 0.0, 0.1],
-        "wallForceDst": 0.3,
-        "wallForceStr": 3.0,
+        "wallForceDst": 0.5,
+        "wallForceStr": 10.0,
         "mouseInteractionRadius": 2.0,
         "mouseInteractionStrength": 50000.0
 	},
@@ -32,7 +33,7 @@
 			"translation": [1.0, 1.0],
 			"scale": [1.0, 1.0],
 			"velocity": [0.0, -50.0],
-			"density": 1000.0,
+			"density": 500.0,
 			"color": [0, 0, 255]
 		}
 	]

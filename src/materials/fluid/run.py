@@ -154,10 +154,8 @@ if __name__ == "__main__":
             strength = 0.0
             if window.is_pressed(ti.ui.LMB):  # Left mouse button = attract
                 strength = mouse_interaction_strength
-                print(f"Mouse attract at ({world_x:.2f}, {world_y:.2f}), strength={strength}")
             elif window.is_pressed(ti.ui.RMB):  # Right mouse button = repel
                 strength = -mouse_interaction_strength
-                print(f"Mouse repel at ({world_x:.2f}, {world_y:.2f}), strength={strength}")
             
             solver.update_mouse_interaction(world_x, world_y, strength)
         
