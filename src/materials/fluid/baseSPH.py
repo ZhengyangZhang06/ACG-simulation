@@ -58,31 +58,6 @@ class SPHBase:
                 res = k * (-factor * factor) * grad_q
         return res
 
-    @ti.func
-    def pressure_force(self, p_i, p_j, r_ij):
-        p_i_pressure = self.ps.pressure[p_i]
-        p_j_pressure = self.ps.pressure[p_j]
-        rho_i = self.ps.density[p_i]
-        rho_j = self.ps.density[p_j]
-        force = -self.mass * (p_i_pressure / (rho_i * rho_i) + p_j_pressure / (rho_j * rho_j)) * self.cubic_kernel_derivative(r_ij)
-        return force
-
-    @ti.func
-    def viscosity_force(self, p_i, p_j, r):
-        v_xy = (self.ps.v[p_i] - self.ps.v[p_j]).dot(r)
-        res = 2 * (self.ps.dim + 2) * self.viscosity * (self.ps.m[p_j] / self.ps.density[p_j]) * v_xy / (
-            r.norm()**2 + 0.01 * self.h**2) * self.cubic_kernel_derivative(r)
-        return res
-
-    @ti.func
-    def surface_tension_force(self, p_i, p_j, r_ij):
-        r_norm = r_ij.norm()
-        res = ti.Vector([0.0 for _ in range(self.ps.dim)])
-        if r_norm > self.ps.particle_diameter:
-            res -= self.surface_tension * self.ps.density[p_j] / self.ps.density[p_i] * self.cubic_kernel(r_norm) * r_ij
-        else:
-            res -= self.surface_tension * self.ps.density[p_j] / self.ps.density[p_i] * self.cubic_kernel(self.ps.particle_diameter) * r_ij
-        return res
 
     @ti.kernel
     def compute_static_boundary_volume(self):
@@ -101,18 +76,19 @@ class SPHBase:
 
     @ti.kernel
     def compute_moving_boundary_volume(self):
-        for p_i in range(self.ps.particle_num[None]):
-            if self.ps.is_dynamic_rigid_body(p_i):
-                delta = self.cubic_kernel(0.0)
-                for j in range(self.ps.particle_neighbors_num[p_i]):
-                    p_j = self.ps.particle_neighbors[p_i, j]
-                    if self.ps.material[p_j] == self.ps.material_solid:
-                        x_ij = self.ps.x[p_i] - self.ps.x[p_j]
-                        delta += self.cubic_kernel(x_ij.norm())
-                if delta > 1e-6:
-                    self.ps.boundary_volume[p_i] = 1.0 / delta
-                else:
-                    self.ps.boundary_volume[p_i] = 0.0
+        for p_i in ti.grouped(self.ps.x):
+            if not self.ps.is_dynamic_rigid_body(p_i):
+                continue
+            delta = self.cubic_kernel(0.0)
+            for j in range(self.ps.particle_neighbors_num[p_i]):
+                p_j = self.ps.particle_neighbors[p_i, j]
+                if self.ps.material[p_j] == self.ps.material_solid:
+                    x_ij = self.ps.x[p_i] - self.ps.x[p_j]
+                    delta += self.cubic_kernel(x_ij.norm())
+            if delta > 1e-6:
+                self.ps.boundary_volume[p_i] = 1.0 / delta * 3.0
+            else:
+                self.ps.boundary_volume[p_i] = 0.0
 
     @ti.kernel
     def compute_rigid_rest_cm_kernel(self, object_id: int):
