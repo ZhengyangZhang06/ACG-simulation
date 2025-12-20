@@ -18,10 +18,10 @@
         "numFrames": 800,
         "appleWeight": 5.0,
         "appleDisplaceWeight": 30.0,
-        "appleSpreadStrength": 10.0,
+        "appleSpreadStrength": 2.0,
         "appleTestParams": [0.99, 1.0, 0.0, 0.1],
         "wallForceDst": 0.5,
-        "wallForceStr": 10.0,
+        "wallForceStr": 5.0,
         "mouseInteractionRadius": 2.0,
         "mouseInteractionStrength": 50000.0
 	},

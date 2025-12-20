@@ -219,28 +219,54 @@ class WCSPHSolver(SPHBase):
                 force_multiplier = 1.0
                 
                 if has_nearest:
+                    # Get local density ratio to determine if area is crowded
+                    density_ratio = self.ps.density[p_i] / self.density_0
+                    is_crowded = density_ratio > 1.2  # Crowded if density > 120% of rest density
+                    
                     if world_distance > 0.5:  # Far from white region (in black region)
                         # Strong attraction toward white region
                         if offset_len_sq > 0.0001:
                             dir_normalized = offset.normalized()
                             force_multiplier = 1.0
-                    elif world_distance > 0.05:  # Approaching white region
-                        # Moderate attraction
+                    elif world_distance > 0.15:  # Approaching white region
+                        # Moderate attraction, gradually reduce as getting closer
                         if offset_len_sq > 0.0001:
                             dir_normalized = offset.normalized()
-                            force_multiplier = world_distance  # Reduce as getting closer
-                    else:  # Inside or very close to white region (world_distance < 0.05)
-                        # Spread particles: push away from boundary
-                        if offset_len_sq > 0.0001:
-                            # Push in opposite direction of boundary
-                            dir_normalized = -offset.normalized()
-                            # Stronger push when closer to boundary
-                            force_multiplier = self.apple_spread_strength * (1.0 - world_distance / 0.05)
+                            # Smooth transition: full force at 0.5, zero at 0.15
+                            force_multiplier = (world_distance - 0.15) / (0.5 - 0.15)
+                    else:  # Inside white region (world_distance < 0.15)
+                        # Goal: Move toward boundary (to outline the shape)
+                        # BUT: Spread out if too crowded
+                        
+                        if is_crowded:
+                            # Too crowded - use spreading force to reduce density
+                            pos_hash = (ti.cast(pos_centered[0] * 1000.0, int) * 73856093) ^ (ti.cast(pos_centered[1] * 1000.0, int) * 19349663)
+                            angle = (pos_hash % 628318) / 100000.0
+                            spread_dir = ti.Vector([ti.cos(angle), ti.sin(angle)])
+                            
+                            # Also add component away from boundary
+                            if offset_len_sq > 0.0001:
+                                boundary_dir = -offset.normalized()
+                                spread_dir = (spread_dir * 0.5 + boundary_dir * 0.5).normalized()
+                            
+                            dir_normalized = spread_dir
+                            # Strong spreading when crowded
+                            force_multiplier = self.apple_spread_strength * (density_ratio - 1.0)
                         else:
-                            # On a white pixel, use pseudo-random spread
-                            angle = p_i * 2.618
-                            dir_normalized = ti.Vector([ti.cos(angle), ti.sin(angle)])
-                            force_multiplier = self.apple_spread_strength * 0.5
+                            # Not crowded - move toward boundary to outline the shape
+                            if offset_len_sq > 0.0001:
+                                # Move toward nearest boundary
+                                dir_normalized = offset.normalized()
+                                # Stronger pull when deeper inside (far from boundary)
+                                # Weaker near boundary to avoid overshooting
+                                distance_factor = world_distance / 0.15  # 0 at boundary, 1 at depth
+                                force_multiplier = self.apple_spread_strength * distance_factor * 0.5
+                            else:
+                                # Exactly on white pixel - very weak random drift
+                                pos_hash = (ti.cast(pos_centered[0] * 1000.0, int) * 73856093) ^ (ti.cast(pos_centered[1] * 1000.0, int) * 19349663)
+                                angle = (pos_hash % 628318) / 100000.0
+                                dir_normalized = ti.Vector([ti.cos(angle), ti.sin(angle)])
+                                force_multiplier = self.apple_spread_strength * 0.1
                 
                 # HLSL: gravityAccel += dir * appleForce;
                 apple_force = self.apple_weight * force_multiplier
@@ -329,15 +355,25 @@ class WCSPHSolver(SPHBase):
             
             # Check excessive velocity
             vel_mag_sq = vel.dot(vel)
-            if vel_mag_sq > 10000.0:  # Speed > 100
+            if vel_mag_sq > 40000.0:  # Speed > 200
                 is_invalid = True
             
             # Respawn if invalid
             if is_invalid:
-                # Random position in domain
-                hash_val = (p_i * ti.u32(2654435761)) % 1000000
-                rand_x = (hash_val % 1000) / 1000.0
-                rand_y = ((hash_val // 1000) % 1000) / 1000.0
+                # Better pseudo-random number generation using multiple hash stages
+                # Use frame count as additional entropy source for temporal variation
+                seed = p_i + self.current_frame_field[None] * 10007
+                
+                # Multiple hash stages for better randomness
+                hash1 = (seed * ti.u32(2654435761)) % ti.u32(1000000007)
+                hash2 = (hash1 * ti.u32(1103515245) + ti.u32(12345)) % ti.u32(1000000007)
+                hash3 = (hash2 * ti.u32(134775813) + ti.u32(1)) % ti.u32(1000000007)
+                
+                # Convert to [0, 1] range
+                rand_x = (hash1 % ti.u32(10000)) / 10000.0
+                rand_y = (hash2 % ti.u32(10000)) / 10000.0
+                rand_vx = (hash3 % ti.u32(10000)) / 10000.0
+                rand_vy = ((hash3 // ti.u32(10000)) % ti.u32(10000)) / 10000.0
                 
                 # Spawn in center region with some spread
                 center = (domain_start + domain_end) / 2
@@ -345,8 +381,8 @@ class WCSPHSolver(SPHBase):
                 new_pos = center + (ti.Vector([rand_x, rand_y]) - 0.5) * 2.0 * spread
                 
                 # Random velocity (small)
-                angle = rand_x * 6.28318  # 2*pi
-                speed = rand_y * 2.0
+                angle = rand_vx * 6.28318  # 2*pi
+                speed = rand_vy * 2.0
                 new_vel = ti.Vector([ti.cos(angle), ti.sin(angle)]) * speed
                 
                 self.ps.x[p_i][:2] = new_pos
