@@ -86,6 +86,7 @@ class WCSPHSolver(SPHBase):
             self.num_frames = 1
             self.apple_weight = 0.0
             self.apple_displace_weight = 0.0
+            self.apple_spread_strength = 0.0
             self.apple_test_params = [1.0, 1.0, 0.0, 0.1]
             self.wall_force_dst = 0.5
             self.wall_force_str = 0.0
@@ -354,9 +355,9 @@ class WCSPHSolver(SPHBase):
                 is_invalid = True
             
             # Check excessive velocity
-            vel_mag_sq = vel.dot(vel)
-            if vel_mag_sq > 40000.0:  # Speed > 200
-                is_invalid = True
+            # vel_mag_sq = vel.dot(vel)
+            # if vel_mag_sq > 250000.0:  # Speed > 500
+            #     is_invalid = True
             
             # Respawn if invalid
             if is_invalid:
@@ -419,7 +420,7 @@ class WCSPHSolver(SPHBase):
                 
                 self.current_frame_field[None] = next_frame
                 
-                if next_frame % 1 == 0:  # Print every 10 frames (change 10 to desired interval)
+                if next_frame % 1 == 0:  # Print every 1 frames (change 1 to desired interval)
                     print(f"Video frame: {next_frame}/{self.num_frames}")
     
     def substep(self):
@@ -428,4 +429,5 @@ class WCSPHSolver(SPHBase):
         self.compute_pressure_forces()
         self.compute_non_pressure_forces()
         self.advect()
-        self.check_and_respawn_particles()
+        if self.is_bad_apple or self.mouse_strength[None] != 0.0:
+            self.check_and_respawn_particles()

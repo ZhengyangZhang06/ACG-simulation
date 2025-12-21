@@ -8,12 +8,10 @@ class SimConfig:
             self.config = json.load(f)
         print(self.config)
     
-    def get_cfg(self, name, enforce_exist=False):
-        if enforce_exist:
-            assert name in self.config["Configuration"]
+    def get_cfg(self, name, default_value=None):
         if name not in self.config["Configuration"]:
-            if enforce_exist:
-                assert name in self.config["Configuration"]
+            if default_value is not None:
+                return default_value
             else:
                 return None
         return self.config["Configuration"][name]
