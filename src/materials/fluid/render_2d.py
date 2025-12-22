@@ -59,6 +59,9 @@ class Renderer2D:
             max_velocity = config.get('maxVelocityFor2DRender', 50.0)
             dist_threshold = config.get('distThresholdFor2DRender', 10.0)
             
+            # Check if image has white pixels
+            has_white = np.any(image_data > 0.5)
+            
             # Classify particles
             background_particles = []
             normal_particles = []
@@ -80,21 +83,22 @@ class Renderer2D:
                 # Get image value (0=black, 1=white)
                 img_value = image_data[pixel_x, pixel_y]
                 
-                # Background particle: black region AND near white region (finite distance)
-                # In JFA, black regions have valid=0, but if near white, they have finite best_dist
-                if img_value < 0.5 and best_dist < 1e9:
-                    # Background particle: black region with nearby white pixels
+                # Classification logic:
+                # Background particle: black region AND image has white pixels
+                # Normal particle: white region OR pure black image (no white pixels)
+                if has_white and img_value < 0.5:
+                    # Background particle: black region when image has white
                     background_particles.append((pos, vel, best_dist))
                 else:
-                    # Normal particle: white region OR pure black (no nearby white)
+                    # Normal particle: white region OR all particles in pure black image
                     normal_particles.append((pos, vel))
             
             # Render background particles first (behind)
             pixel_base_radius = self.world_radius_to_pixel(base_radius)
             for pos, vel, best_dist in background_particles:
                 # Radius decreases linearly with distance
-                if best_dist > dist_threshold:
-                    continue  # Don't render if too far
+                # if best_dist > dist_threshold:
+                #     continue  # Don't render if too far
                 
                 # radius_ratio = 1.0 - (best_dist / dist_threshold)
                 # particle_radius = pixel_base_radius * radius_ratio
@@ -119,8 +123,8 @@ class Renderer2D:
                 speed = np.sqrt(vel[0]**2 + vel[1]**2)
                 
                 # Color interpolation
-                base_color = np.array([0, 50, 255])
-                white_color = np.array([200, 250, 255])
+                base_color = np.array([0, 90, 255])
+                white_color = np.array([180, 250, 255])
                 
                 t = min(speed / max_velocity, 1.0)  # Clamp to [0, 1]
                 color_float = base_color * (1 - t) + white_color * t

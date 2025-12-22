@@ -6,7 +6,7 @@
 		"particleRadius": 0.02,
 		"numberOfStepsPerRenderUpdate": 84,
         "exportPly": false,
-        "exportImages": false,
+        "exportImages": true,
 		"exportObj": false,
         "export2DRenders": true,
         "cameraPosition": [5.0, 3.75, 6.0],
@@ -17,7 +17,7 @@
         "windowSize": [1440, 1080],
         "badAppleFrameInterval": 2,
         "badAppleLoopVideo": false,
-        "numFrames": 2000,
+        "numFrames": 6572,
         "appleWeight": 10.0,
         "appleDisplaceWeight": 30.0,
         "appleSpreadStrength": 2.0,
@@ -26,7 +26,7 @@
         "wallForceStr": 0.0,
         "mouseInteractionRadius": 2.0,
         "mouseInteractionStrength": 50000.0,
-        "maxVelocityFor2DRender": 40.0,
+        "maxVelocityFor2DRender": 38.0,
         "distThresholdFor2DRender": 500.0
 	},
 	"FluidBlocks": [

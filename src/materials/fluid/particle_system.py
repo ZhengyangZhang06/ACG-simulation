@@ -285,7 +285,7 @@ class ParticleSystem:
                     self.color_vis_buffer[p] = ti.Vector([0.0, 0.0, 1.0])
                     self.radius_vis_buffer[p] = self.particle_radius * 0.5
                 else:
-                    self.color_vis_buffer[p] = ti.Vector([60.0 / 255.0, 100.0 / 255.0, 1.0])
+                    self.color_vis_buffer[p] = ti.Vector([20.0 / 255.0, 80.0 / 255.0, 1.0])
                     self.radius_vis_buffer[p] = self.particle_radius
             else:
                 self.color_vis_buffer[p] = self.color[p]
