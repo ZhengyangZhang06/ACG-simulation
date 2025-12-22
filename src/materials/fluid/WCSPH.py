@@ -8,7 +8,7 @@ class WCSPHSolver(SPHBase):
     def __init__(self, particle_system, config):
         super().__init__(particle_system)
         self.exponent = 7.0
-        self.stiffness = 5000.0
+        self.stiffness = 50000.0
         self.config = config
         self.is_bad_apple = config.get_cfg("isBadApple", False)
         
@@ -137,14 +137,13 @@ class WCSPHSolver(SPHBase):
                     self.ps.acceleration[p_j] += -f_p * self.density_0 / self.ps.density[p_j]
             
             if self.bad_apple_enabled[None] == 1 and self.ps.material[p_i] == self.ps.material_fluid:
-                # HLSL: float dstWallX = boundsSize.x / 2 - abs(pos.x);
+
                 bounds_size = ti.Vector(self.ps.domain_end[:2]) - ti.Vector(self.ps.domain_start[:2])
                 domain_center = (ti.Vector(self.ps.domain_end[:2]) + ti.Vector(self.ps.domain_start[:2])) / 2
                 pos_centered = x_i[:2] - domain_center
                 dst_wall_x = bounds_size[0] / 2 - ti.abs(pos_centered[0])
                 dst_wall_y = bounds_size[1] / 2 - ti.abs(pos_centered[1])
                 
-                # HLSL: float2 wallAccel = saturate(1 - float2(dstWallX, dstWallY) / wallForceDst) * wallForceStr * density * -sign(pos);
                 wall_factor_x = ti.max(0.0, ti.min(1.0, 1.0 - dst_wall_x / self.wall_force_dst))
                 wall_factor_y = ti.max(0.0, ti.min(1.0, 1.0 - dst_wall_y / self.wall_force_dst))
                 wall_accel = ti.Vector([
@@ -153,7 +152,6 @@ class WCSPHSolver(SPHBase):
                 ])
                 d_v += wall_accel
                 
-                # HLSL: Velocities[id.x] *= appleTestParams.x;
                 self.ps.v[p_i] *= self.apple_test_params[0]
             
             self.ps.acceleration[p_i] += d_v
@@ -199,8 +197,7 @@ class WCSPHSolver(SPHBase):
                 # This normalizes to [0, 1] range
                 pos_t = (pos_centered + bounds_size / 2) / bounds_size
                 # HLSL: posT.x = min(max(0, posT.x), boundsSize.x);
-                # Note: The reference code clamps to boundsSize.x, but this seems like it should be 1.0
-                # since posT is normalized. Keeping exact reference behavior:
+                # Note: The reference code clamps to boundsSize.x, but this should be 1.0 since posT is normalized
                 pos_t[0] = ti.min(ti.max(0.0, pos_t[0]), 1.0)
                 pos_t[1] = ti.min(ti.max(0.0, pos_t[1]), 1.0)
                 # HLSL: int2 pixelCoord = (int2)(posT * (texSize-1));
@@ -226,56 +223,57 @@ class WCSPHSolver(SPHBase):
                     density_ratio = self.ps.density[p_i] / self.density_0
                     is_crowded = density_ratio > 1.2  # Crowded if density > 120% of rest density
                     
-                    if world_distance > 0.5:  # Far from white region (in black region)
+                    if world_distance > 0.3:  # Far from white region (in black region)
                         # Strong attraction toward white region
                         if offset_len_sq > 0.0001:
                             dir_normalized = offset.normalized()
                             force_multiplier = 1.0
-                    elif world_distance > 0.15:  # Approaching white region
+                    elif world_distance > 0.0:  # Approaching white region
                         # Moderate attraction, gradually reduce as getting closer
                         if offset_len_sq > 0.0001:
                             dir_normalized = offset.normalized()
                             # Smooth transition: full force at 0.5, zero at 0.15
                             force_multiplier = (world_distance - 0.15) / (0.5 - 0.15)
-                    else:  # Inside white region (world_distance < 0.15)
-                        # Goal: Move toward boundary (to outline the shape)
-                        # BUT: Spread out if too crowded
+                    # else:  # Inside white region (world_distance < 0.15)
+                    #     # Goal: Move toward boundary (to outline the shape)
+                    #     # BUT: Spread out if too crowded
                         
-                        if is_crowded:
-                            # Too crowded - use spreading force to reduce density
-                            pos_hash = (ti.cast(pos_centered[0] * 1000.0, int) * 73856093) ^ (ti.cast(pos_centered[1] * 1000.0, int) * 19349663)
-                            angle = (pos_hash % 628318) / 100000.0
-                            spread_dir = ti.Vector([ti.cos(angle), ti.sin(angle)])
+                    #     if is_crowded:
+                    #         # Too crowded - use spreading force to reduce density
+                    #         pos_hash = (ti.cast(pos_centered[0] * 1000.0, int) * 73856093) ^ (ti.cast(pos_centered[1] * 1000.0, int) * 19349663)
+                    #         angle = (pos_hash % 628318) / 100000.0
+                    #         spread_dir = ti.Vector([ti.cos(angle), ti.sin(angle)])
                             
-                            # Also add component away from boundary
-                            if offset_len_sq > 0.0001:
-                                boundary_dir = -offset.normalized()
-                                spread_dir = (spread_dir * 0.5 + boundary_dir * 0.5).normalized()
+                    #         # Also add component away from boundary
+                    #         if offset_len_sq > 0.0001:
+                    #             boundary_dir = -offset.normalized()
+                    #             spread_dir = (spread_dir * 0.5 + boundary_dir * 0.5).normalized()
                             
-                            dir_normalized = spread_dir
-                            # Strong spreading when crowded
-                            force_multiplier = self.apple_spread_strength * (density_ratio - 1.0)
-                        else:
-                            # Not crowded - move toward boundary to outline the shape
-                            if offset_len_sq > 0.0001:
-                                # Move toward nearest boundary
-                                dir_normalized = offset.normalized()
-                                # Stronger pull when deeper inside (far from boundary)
-                                # Weaker near boundary to avoid overshooting
-                                distance_factor = world_distance / 0.15  # 0 at boundary, 1 at depth
-                                force_multiplier = self.apple_spread_strength * distance_factor * 0.5
-                            else:
-                                # Exactly on white pixel - very weak random drift
-                                pos_hash = (ti.cast(pos_centered[0] * 1000.0, int) * 73856093) ^ (ti.cast(pos_centered[1] * 1000.0, int) * 19349663)
-                                angle = (pos_hash % 628318) / 100000.0
-                                dir_normalized = ti.Vector([ti.cos(angle), ti.sin(angle)])
-                                force_multiplier = self.apple_spread_strength * 0.1
+                    #         dir_normalized = spread_dir
+                    #         # Strong spreading when crowded
+                    #         force_multiplier = self.apple_spread_strength * (density_ratio - 1.0)
+                        # else:
+                        #     # Not crowded - move toward boundary to outline the shape
+                        #     if offset_len_sq > 0.0001:
+                        #         # Move toward nearest boundary
+                        #         dir_normalized = offset.normalized()
+                        #         # Stronger pull when deeper inside (far from boundary)
+                        #         # Weaker near boundary to avoid overshooting
+                        #         distance_factor = world_distance / 0.15  # 0 at boundary, 1 at depth
+                        #         force_multiplier = self.apple_spread_strength * distance_factor * 0.5
+                        #     else:
+                        #         # Exactly on white pixel - very weak random drift
+                        #         pos_hash = (ti.cast(pos_centered[0] * 1000.0, int) * 73856093) ^ (ti.cast(pos_centered[1] * 1000.0, int) * 19349663)
+                        #         angle = (pos_hash % 628318) / 100000.0
+                        #         dir_normalized = ti.Vector([ti.cos(angle), ti.sin(angle)])
+                        #         force_multiplier = self.apple_spread_strength * 0.1
                 
                 # HLSL: gravityAccel += dir * appleForce;
                 apple_force = self.apple_weight * force_multiplier
                 d_v += dir_normalized * apple_force
                 # HLSL: Positions[index] += dir * deltaTime * appleDisplaceWeight;
                 displace = dir_normalized * ti.min(offset.norm(), self.dt[None] * self.apple_displace_weight)
+                # displace = dir_normalized * self.dt[None] * self.apple_displace_weight
                 self.ps.x[p_i][:2] += displace
             
             self.ps.acceleration[p_i] = d_v

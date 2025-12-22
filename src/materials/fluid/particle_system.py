@@ -40,7 +40,9 @@ class ParticleSystem:
         # Process Fluid Blocks
         fluid_blocks = self.cfg.get_fluid_blocks()
         for fluid in fluid_blocks:
-            particle_num = self.compute_cube_particle_num(fluid["start"], fluid["end"])
+            particle_spacing_factor = fluid.get("particleSpacing", 2.0)
+            spacing = particle_spacing_factor * self.particle_radius
+            particle_num = self.compute_cube_particle_num(fluid["start"], fluid["end"], spacing)
             fluid["particleNum"] = particle_num
             self.object_collection[fluid["objectId"]] = fluid
             fluid_particle_num += particle_num
@@ -116,17 +118,20 @@ class ParticleSystem:
         for fluid in fluid_blocks:
             offset = np.array(fluid["translation"])
             start = np.array(fluid["start"]) + offset
-            end = np.array(fluid["end"]) + offset
             scale = np.array(fluid["scale"])
+            actual_end = start + (np.array(fluid["end"]) - np.array(fluid["start"])) * scale
+            particle_spacing_factor = fluid.get("particleSpacing", 2.0)
+            spacing = particle_spacing_factor * self.particle_radius
             self.add_cube(
                 start=start,
-                end=start + (end - start) * scale,
+                end=actual_end,
                 velocity=fluid["velocity"],
                 density=fluid["density"],
                 color=fluid["color"],
                 material=self.material_fluid,
                 is_dynamic=1,
-                object_id=fluid["objectId"]
+                object_id=fluid["objectId"],
+                spacing=spacing
             )
 
         # Fluid bodies (mesh-based)
@@ -181,20 +186,22 @@ class ParticleSystem:
         voxelized_mesh = mesh.voxelized(pitch=self.particle_diameter).fill()
         return voxelized_mesh.points
 
-    def compute_cube_particle_num(self, start, end):
-        num_dim = [np.arange(start[i], end[i], self.particle_diameter) for i in range(self.dim)]
+    def compute_cube_particle_num(self, start, end, spacing):
+        num_dim = [np.arange(start[i], end[i], spacing) for i in range(self.dim)]
         return reduce(lambda x, y: x * y, [len(n) for n in num_dim])
 
-    def add_cube(self, start, end, velocity, density, color, material, is_dynamic, object_id=0):
+    def add_cube(self, start, end, velocity, density, color, material, is_dynamic, object_id=0, spacing=None):
+        if spacing is None:
+            spacing = self.particle_diameter
         if self.dim == 2:
-            x_coords = np.arange(start[0], end[0], self.particle_diameter)
-            y_coords = np.arange(start[1], end[1], self.particle_diameter)
+            x_coords = np.arange(start[0], end[0], spacing)
+            y_coords = np.arange(start[1], end[1], spacing)
             X, Y = np.meshgrid(x_coords, y_coords)
             positions = np.column_stack((X.ravel(), Y.ravel()))
         else:
-            x_coords = np.arange(start[0], end[0], self.particle_diameter)
-            y_coords = np.arange(start[1], end[1], self.particle_diameter)
-            z_coords = np.arange(start[2], end[2], self.particle_diameter)
+            x_coords = np.arange(start[0], end[0], spacing)
+            y_coords = np.arange(start[1], end[1], spacing)
+            z_coords = np.arange(start[2], end[2], spacing)
             X, Y, Z = np.meshgrid(x_coords, y_coords, z_coords)
             positions = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
         
@@ -274,22 +281,24 @@ class ParticleSystem:
     def copy_to_vis_buffer_kernel(self):
         for p in range(self.particle_num[None]):
             self.x_vis_buffer[p] = self.x[p]
-            if self.is_bad_apple[None] == 1:
-                pos = self.x[p][:2]
-                pixel_x = ti.cast(pos[0] / self.domain_size[0] * (self.bad_apple_size[0] - 1), ti.i32)
-                pixel_y = ti.cast(pos[1] / self.domain_size[1] * (self.bad_apple_size[1] - 1), ti.i32)
-                pixel_x = ti.max(0, ti.min(pixel_x, self.bad_apple_size[0] - 1))
-                pixel_y = ti.max(0, ti.min(pixel_y, self.bad_apple_size[1] - 1))
-                val = self.image_tex[0, pixel_x, pixel_y]
-                if val < 0.5:
-                    self.color_vis_buffer[p] = ti.Vector([0.0, 0.0, 1.0])
-                    self.radius_vis_buffer[p] = self.particle_radius * 0.5
-                else:
-                    self.color_vis_buffer[p] = ti.Vector([20.0 / 255.0, 80.0 / 255.0, 1.0])
-                    self.radius_vis_buffer[p] = self.particle_radius
-            else:
-                self.color_vis_buffer[p] = self.color[p]
-                self.radius_vis_buffer[p] = self.particle_radius
+            self.color_vis_buffer[p] = self.color[p]
+            self.radius_vis_buffer[p] = self.particle_radius
+            # if self.is_bad_apple[None] == 1:
+            #     pos = self.x[p][:2]
+            #     pixel_x = ti.cast(pos[0] / self.domain_size[0] * (self.bad_apple_size[0] - 1), ti.i32)
+            #     pixel_y = ti.cast(pos[1] / self.domain_size[1] * (self.bad_apple_size[1] - 1), ti.i32)
+            #     pixel_x = ti.max(0, ti.min(pixel_x, self.bad_apple_size[0] - 1))
+            #     pixel_y = ti.max(0, ti.min(pixel_y, self.bad_apple_size[1] - 1))
+            #     val = self.image_tex[0, pixel_x, pixel_y]
+            #     if val < 0.5:
+            #         self.color_vis_buffer[p] = ti.Vector([0.0, 0.0, 1.0])
+            #         self.radius_vis_buffer[p] = self.particle_radius * 0.5
+            #     else:
+            #         self.color_vis_buffer[p] = ti.Vector([20.0 / 255.0, 80.0 / 255.0, 1.0])
+            #         self.radius_vis_buffer[p] = self.particle_radius
+            # else:
+            #     self.color_vis_buffer[p] = self.color[p]
+            #     self.radius_vis_buffer[p] = self.particle_radius
 
     def copy_to_vis_buffer(self):
         self.copy_to_vis_buffer_kernel()

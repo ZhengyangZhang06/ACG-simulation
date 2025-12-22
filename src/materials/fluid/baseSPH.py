@@ -5,7 +5,7 @@ import numpy as np
 class SPHBase:
     def __init__(self, particle_system):
         self.ps = particle_system
-        self.g = -5.0
+        self.g = -1.0
         self.viscosity = 0.001
         self.density_0 = 1000.0
         self.surface_tension = 0.01
