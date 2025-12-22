@@ -5,6 +5,7 @@ import argparse
 from config_builder import SimConfig
 from particle_system import ParticleSystem
 from WCSPH import WCSPHSolver
+from render_2d import Renderer2D
 
 ti.init(arch=ti.gpu, device_memory_fraction=0.5)
 
@@ -70,6 +71,10 @@ if __name__ == "__main__":
     image_output_dir = f"output/fluid/{scene_name}/images"
     image_interval = 84
     
+    export_2d_renders = config.get_cfg("export2DRenders", False)
+    render_2d_output_dir = f"output/fluid/{scene_name}/render"
+    render_2d_interval = 84
+    
     show_window = not export_images_enabled
     
     if export_ply_enabled:
@@ -80,8 +85,15 @@ if __name__ == "__main__":
     
     if export_images_enabled:
         os.makedirs(image_output_dir, exist_ok=True)
-
-    window_size = config.get_cfg("windowSize", [1024, 1024])
+    
+    if export_2d_renders:
+        os.makedirs(render_2d_output_dir, exist_ok=True)
+        domain_start = config.get_cfg("domainStart")
+        domain_end = config.get_cfg("domainEnd")
+        window_size = config.get_cfg("windowSize", [1024, 1024])
+        renderer_2d = Renderer2D(window_size[0], window_size[1], domain_start, domain_end, render_2d_output_dir)
+    else:
+        window_size = config.get_cfg("windowSize", [1024, 1024])
     window = ti.ui.Window('SPH', tuple(window_size), show_window=show_window, vsync=False)
     scene = ti.ui.Scene()
     camera = ti.ui.Camera()
@@ -129,6 +141,7 @@ if __name__ == "__main__":
     step_count = 0
     frame_count = 0
     image_frame_count = 0
+    render_2d_frame_count = 0
     
     # Mouse interaction settings
     mouse_interaction_strength = config.get_cfg("mouseInteractionStrength", 100.0)
@@ -202,7 +215,40 @@ if __name__ == "__main__":
                 print(f"Exported image frame {image_frame_count}")
                 image_frame_count += 1
         
-        if ((export_ply_enabled or export_obj_enabled) and frame_count >= max_frames) or (export_images_enabled and image_frame_count >= max_frames):
+        # Export 2D renders
+        if export_2d_renders and step_count % render_2d_interval == 0:
+            if render_2d_frame_count < max_frames:
+                # Gather particle data
+                num_particles = ps.particle_num[None]
+                positions_np = ps.x.to_numpy()[:num_particles, :2]  # Only XY
+                velocities_np = ps.v.to_numpy()[:num_particles, :2]
+                
+                particles_data = {
+                    'positions': positions_np,
+                    'velocities': velocities_np,
+                    'radius': ps.particle_radius
+                }
+                
+                # Check if Bad Apple mode
+                bad_apple_data = None
+                render_config = None
+                if hasattr(solver, 'is_bad_apple') and solver.is_bad_apple:
+                    current_frame = solver.current_frame_field[None]
+                    bad_apple_data = {
+                        'jfa_results': solver.jfa_results[current_frame],
+                        'image_data': solver.frames[current_frame],
+                        'size': solver.bad_apple_size
+                    }
+                    render_config = {
+                        'maxVelocityFor2DRender': config.get_cfg('maxVelocityFor2DRender', 50.0),
+                        'distThresholdFor2DRender': config.get_cfg('distThresholdFor2DRender', 10.0)
+                    }
+                
+                renderer_2d.render_frame(particles_data, render_2d_frame_count, bad_apple_data, render_config)
+                print(f"Exported 2D render frame {render_2d_frame_count}")
+                render_2d_frame_count += 1
+        
+        if ((export_ply_enabled or export_obj_enabled) and frame_count >= max_frames) or (export_images_enabled and image_frame_count >= max_frames) or (export_2d_renders and render_2d_frame_count >= max_frames):
             break
 
     print(f"Simulation Finished")
