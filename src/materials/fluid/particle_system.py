@@ -28,6 +28,11 @@ class ParticleSystem:
         self.object_collection = dict()
         self.object_id_rigid_body = set()
 
+        self.bad_apple_size = np.array(self.cfg.get_cfg("badAppleSize", [480, 360]))
+        self.is_bad_apple = ti.field(dtype=ti.i32, shape=())
+        self.is_bad_apple[None] = 1 if self.cfg.get_cfg("isBadApple", False) else 0
+        self.image_tex = ti.field(dtype=ti.f32, shape=(1, self.bad_apple_size[0], self.bad_apple_size[1]))
+
         #========== Compute number of particles ==========#
         fluid_particle_num = 0
         rigid_particle_num = 0
@@ -268,7 +273,19 @@ class ParticleSystem:
     def copy_to_vis_buffer_kernel(self):
         for p in range(self.particle_num[None]):
             self.x_vis_buffer[p] = self.x[p]
-            self.color_vis_buffer[p] = self.color[p]
+            if self.is_bad_apple[None] == 1:
+                pos = self.x[p][:2]
+                pixel_x = ti.cast(pos[0] / self.domain_size[0] * (self.bad_apple_size[0] - 1), ti.i32)
+                pixel_y = ti.cast(pos[1] / self.domain_size[1] * (self.bad_apple_size[1] - 1), ti.i32)
+                pixel_x = ti.max(0, ti.min(pixel_x, self.bad_apple_size[0] - 1))
+                pixel_y = ti.max(0, ti.min(pixel_y, self.bad_apple_size[1] - 1))
+                val = self.image_tex[0, pixel_x, pixel_y]
+                if val < 0.5:
+                    self.color_vis_buffer[p] = ti.Vector([0.0, 0.0, 1.0])
+                else:
+                    self.color_vis_buffer[p] = ti.Vector([60.0 / 255.0, 100.0 / 255.0, 1.0])
+            else:
+                self.color_vis_buffer[p] = self.color[p]
 
     def copy_to_vis_buffer(self):
         self.copy_to_vis_buffer_kernel()

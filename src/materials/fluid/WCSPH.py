@@ -65,18 +65,20 @@ class WCSPHSolver(SPHBase):
                 frame_path = os.path.join(frames_path, f"{frame_num:04d}.png")
                 frame_img = Image.open(frame_path).convert('L')
                 frame = np.array(frame_img) / 255.0
-                # Flip vertically to match physics coordinate system (Y up)
                 frame = np.flipud(frame)
-                frames.append(frame.T)
-            self.frames = np.array(frames)
+                frames.append(np.ascontiguousarray(frame.T))
+            self.frames = frames  # Keep as list
             self.jfa_results = []
             jfa = JumpFloodAlgorithm(self.bad_apple_size[0], self.bad_apple_size[1], 0.5)
             for frame in self.frames:
                 jfa.run(frame)
                 self.jfa_results.append(jfa.vector_field.to_numpy())
-            self.jfa_results = np.array(self.jfa_results)
-            self.bad_apple_tex = ti.Vector.field(4, dtype=ti.f32, shape=(self.num_frames, self.bad_apple_size[0], self.bad_apple_size[1]))
-            self.bad_apple_tex.from_numpy(self.jfa_results)
+            # Create texture for only current frame
+            self.bad_apple_tex = ti.Vector.field(4, dtype=ti.f32, shape=(1, self.bad_apple_size[0], self.bad_apple_size[1]))
+            # Initialize with first frame
+            self.bad_apple_tex.from_numpy(self.jfa_results[0].reshape(1, self.bad_apple_size[0], self.bad_apple_size[1], 4))
+            # Initialize image texture
+            self.ps.image_tex.from_numpy(self.frames[0].reshape(1, self.bad_apple_size[0], self.bad_apple_size[1]))
             
             # Set frame update interval based on config (default 2 for 30fps video at 60fps render)
             self.frame_update_interval = config.get_cfg("badAppleFrameInterval", 2)
@@ -204,7 +206,7 @@ class WCSPHSolver(SPHBase):
                 # HLSL: int2 pixelCoord = (int2)(posT * (texSize-1));
                 tex_size = ti.Vector(self.bad_apple_size)
                 pixel_coord = (pos_t * (tex_size - 1)).cast(int)
-                data = self.bad_apple_tex[self.current_frame_field[None], pixel_coord[0], pixel_coord[1]]
+                data = self.bad_apple_tex[0, pixel_coord[0], pixel_coord[1]]
                 
                 # HLSL: float2 offset = data.xy - pixelCoord;
                 offset = data[:2] - pixel_coord.cast(float)
@@ -419,6 +421,12 @@ class WCSPHSolver(SPHBase):
                     next_frame = min(current_frame + 1, self.num_frames - 1)
                 
                 self.current_frame_field[None] = next_frame
+                
+                # Update texture with new frame's JFA result
+                result = self.jfa_results[next_frame]
+                self.bad_apple_tex.from_numpy(result.reshape(1, self.bad_apple_size[0], self.bad_apple_size[1], 4))
+                # Update image texture
+                self.ps.image_tex.from_numpy(self.frames[next_frame].reshape(1, self.bad_apple_size[0], self.bad_apple_size[1]))
                 
                 if next_frame % 1 == 0:  # Print every 1 frames (change 1 to desired interval)
                     print(f"Video frame: {next_frame}/{self.num_frames}")

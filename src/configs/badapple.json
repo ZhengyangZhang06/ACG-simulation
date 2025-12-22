@@ -15,7 +15,7 @@
         "badAppleSize": [480, 360],
         "badAppleFrameInterval": 2,
         "badAppleLoopVideo": false,
-        "numFrames": 2000,
+        "numFrames": 7000,
         "appleWeight": 10.0,
         "appleDisplaceWeight": 30.0,
         "appleSpreadStrength": 2.0,
