@@ -109,6 +109,7 @@ class ParticleSystem:
         # Visualization buffers
         self.x_vis_buffer = ti.Vector.field(self.dim, dtype=float, shape=self.particle_max_num)
         self.color_vis_buffer = ti.Vector.field(3, dtype=float, shape=self.particle_max_num)
+        self.radius_vis_buffer = ti.field(dtype=ti.f32, shape=self.particle_max_num)
 
         #========== Initialize particles ==========#
         # Fluid blocks
@@ -282,10 +283,13 @@ class ParticleSystem:
                 val = self.image_tex[0, pixel_x, pixel_y]
                 if val < 0.5:
                     self.color_vis_buffer[p] = ti.Vector([0.0, 0.0, 1.0])
+                    self.radius_vis_buffer[p] = self.particle_radius * 0.5
                 else:
                     self.color_vis_buffer[p] = ti.Vector([60.0 / 255.0, 100.0 / 255.0, 1.0])
+                    self.radius_vis_buffer[p] = self.particle_radius
             else:
                 self.color_vis_buffer[p] = self.color[p]
+                self.radius_vis_buffer[p] = self.particle_radius
 
     def copy_to_vis_buffer(self):
         self.copy_to_vis_buffer_kernel()

@@ -81,7 +81,8 @@ if __name__ == "__main__":
     if export_images_enabled:
         os.makedirs(image_output_dir, exist_ok=True)
 
-    window = ti.ui.Window('SPH', (1024, 1024), show_window=show_window, vsync=False)
+    window_size = config.get_cfg("windowSize", [1024, 1024])
+    window = ti.ui.Window('SPH', tuple(window_size), show_window=show_window, vsync=False)
     scene = ti.ui.Scene()
     camera = ti.ui.Camera()
     cam_pos = config.get_cfg("cameraPosition") or [8.0, 2.5, 6.0]
@@ -187,7 +188,7 @@ if __name__ == "__main__":
         scene.point_light((0.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
         scene.point_light((9.5, 0.5, 2.0), color=(1.0, 1.0, 1.0))
         scene.point_light((9.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
-        scene.particles(ps.x_vis_buffer, radius=ps.particle_radius, per_vertex_color=ps.color_vis_buffer)
+        scene.particles(ps.x_vis_buffer, radius=ps.particle_radius, per_vertex_color=ps.color_vis_buffer, per_vertex_radius=ps.radius_vis_buffer)
         scene.lines(box_anchors, indices=box_lines_indices, color=(0.99, 0.68, 0.28), width=1.0)
         canvas.scene(scene)
 
