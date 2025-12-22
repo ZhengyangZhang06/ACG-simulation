@@ -3,25 +3,25 @@
 	{
         "domainStart": [0.0, 0.0],
         "domainEnd": [10.0, 7.5],
-		"particleRadius": 0.01,
-		"numberOfStepsPerRenderUpdate": 1,
+		"particleRadius": 0.02,
+		"numberOfStepsPerRenderUpdate": 84,
         "exportPly": false,
-        "exportImages": false,
+        "exportImages": true,
 		"exportObj": false,
         "cameraPosition": [5.0, 3.75, 8.0],
         "cameraLookat": [5.0, 3.75, 0.0],
         "isBadApple": true,
         "badAppleFramesPath": "assets/frames",
         "badAppleSize": [480, 360],
-        "badAppleFrameInterval": 100,
-        "badAppleLoopVideo": true,
-        "numFrames": 800,
-        "appleWeight": 5.0,
+        "badAppleFrameInterval": 2,
+        "badAppleLoopVideo": false,
+        "numFrames": 2000,
+        "appleWeight": 10.0,
         "appleDisplaceWeight": 30.0,
         "appleSpreadStrength": 2.0,
-        "appleTestParams": [0.99, 1.0, 0.0, 0.1],
+        "appleTestParams": [1.0, 1.0, 0.0, 0.1],
         "wallForceDst": 0.5,
-        "wallForceStr": 5.0,
+        "wallForceStr": 0.0,
         "mouseInteractionRadius": 2.0,
         "mouseInteractionStrength": 50000.0
 	},
@@ -29,12 +29,12 @@
 		{
             "objectId": 0,
 			"start": [0.0, 0.0],
-			"end": [6.0, 4.5],
+			"end": [8.0, 6.0],
 			"translation": [1.0, 1.0],
 			"scale": [1.0, 1.0],
 			"velocity": [0.0, -50.0],
-			"density": 500.0,
-			"color": [0, 0, 255]
+			"density": 1000.0,
+			"color": [60, 100, 255]
 		}
 	]
 }

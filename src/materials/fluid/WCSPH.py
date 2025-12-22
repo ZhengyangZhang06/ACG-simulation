@@ -273,7 +273,7 @@ class WCSPHSolver(SPHBase):
                 apple_force = self.apple_weight * force_multiplier
                 d_v += dir_normalized * apple_force
                 # HLSL: Positions[index] += dir * deltaTime * appleDisplaceWeight;
-                displace = dir_normalized * self.dt[None] * self.apple_displace_weight
+                displace = dir_normalized * ti.min(offset.norm(), self.dt[None] * self.apple_displace_weight)
                 self.ps.x[p_i][:2] += displace
             
             self.ps.acceleration[p_i] = d_v

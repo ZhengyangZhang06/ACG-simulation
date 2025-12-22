@@ -61,14 +61,14 @@ if __name__ == "__main__":
     export_ply_enabled = config.get_cfg("exportPly", False)
     ply_output_dir = f"output/fluid/{scene_name}/ply_output"
     export_interval = 168
-    max_frames = 200
+    max_frames = 2000
     
     export_obj_enabled = config.get_cfg("exportObj", False)
     obj_output_dir = f"output/fluid/{scene_name}/mesh_output"
     
     export_images_enabled = config.get_cfg("exportImages", False)
     image_output_dir = f"output/fluid/{scene_name}/images"
-    image_interval = 168
+    image_interval = 84
     
     show_window = not export_images_enabled
     
@@ -181,7 +181,12 @@ if __name__ == "__main__":
             camera.track_user_inputs(window, movement_speed=movement_speed, hold_key=ti.ui.MMB)
         scene.set_camera(camera)
 
-        scene.point_light((2.0, 2.0, 2.0), color=(1.0, 1.0, 1.0))
+        # scene.point_light((2.0, 2.0, 2.0), color=(1.0, 1.0, 1.0))
+        scene.point_light((5.0, 3.75, 2.0), color=(1.0, 1.0, 1.0))
+        scene.point_light((0.5, 0.5, 2.0), color=(1.0, 1.0, 1.0))
+        scene.point_light((0.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
+        scene.point_light((9.5, 0.5, 2.0), color=(1.0, 1.0, 1.0))
+        scene.point_light((9.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
         scene.particles(ps.x_vis_buffer, radius=ps.particle_radius, per_vertex_color=ps.color_vis_buffer)
         scene.lines(box_anchors, indices=box_lines_indices, color=(0.99, 0.68, 0.28), width=1.0)
         canvas.scene(scene)
