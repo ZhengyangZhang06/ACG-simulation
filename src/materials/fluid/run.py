@@ -62,7 +62,7 @@ if __name__ == "__main__":
     export_ply_enabled = config.get_cfg("exportPly", False)
     ply_output_dir = f"output/fluid/{scene_name}/ply_output"
     export_interval = 168
-    max_frames = 13144
+    max_frames = 13145
     
     export_obj_enabled = config.get_cfg("exportObj", False)
     obj_output_dir = f"output/fluid/{scene_name}/mesh_output"

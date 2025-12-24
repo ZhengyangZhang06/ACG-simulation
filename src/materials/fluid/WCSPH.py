@@ -144,8 +144,8 @@ class WCSPHSolver(SPHBase):
                 dst_wall_x = bounds_size[0] / 2 - ti.abs(pos_centered[0])
                 dst_wall_y = bounds_size[1] / 2 - ti.abs(pos_centered[1])
                 
-                wall_factor_x = ti.max(0.0, ti.min(1.0, 1.0 - dst_wall_x / self.wall_force_dst))
-                wall_factor_y = ti.max(0.0, ti.min(1.0, 1.0 - dst_wall_y / self.wall_force_dst))
+                wall_factor_x = ti.max(0.0, ti.min(1.0, dst_wall_x / self.wall_force_dst))
+                wall_factor_y = ti.max(0.0, ti.min(1.0, dst_wall_y / self.wall_force_dst))
                 wall_accel = ti.Vector([
                     wall_factor_x * self.wall_force_str * self.ps.density[p_i] * (-ti.math.sign(pos_centered[0])),
                     wall_factor_y * self.wall_force_str * self.ps.density[p_i] * (-ti.math.sign(pos_centered[1]))

@@ -111,7 +111,7 @@ class Renderer2D:
                 
                 px, py = self.world_to_pixel(pos)
                 # Set color using HSV: H=230 (blue), S=1.0 (full saturation), V=0.9 (slightly darker)
-                r, g, b = colorsys.hsv_to_rgb(230/360.0, 1.0, 0.9)
+                r, g, b = colorsys.hsv_to_rgb(227/360.0, 1.0, 0.95)
                 color = (int(r * 255), int(g * 255), int(b * 255))
                 
                 # Draw filled circle
@@ -129,12 +129,12 @@ class Renderer2D:
                 t = min(speed / max_velocity, 1.0)  # Clamp to [0, 1]
                 
                 # Fixed hue (blue) and value (full brightness)
-                target_h = 225 / 360.0  # Blue hue
+                target_h = 224 / 360.0  # Blue hue
                 target_v = 1.0  # Full brightness
                 
                 # Saturation values: deep blue to light blue
-                base_s = 0.97      # Deep blue saturation
-                white_s = 0.10   # Light blue saturation (from white_color)
+                base_s = 1.0      # Deep blue saturation
+                white_s = 0.03   # Light blue saturation (from white_color)
                 
                 target_s = base_s * (1 - t) + white_s * t
                 
