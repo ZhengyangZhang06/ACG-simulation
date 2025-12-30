@@ -1,0 +1,45 @@
+{
+	"Configuration": 
+	{
+        "domainStart": [0.0, 0.0],
+        "domainEnd": [10.0, 7.5],
+		"particleRadius": 0.012,
+		"numberOfStepsPerRenderUpdate": 84,
+        "exportPly": false,
+        "exportImages": true,
+		"exportObj": false,
+        "export2DRenders": true,
+        "cameraPosition": [5.0, 3.75, 6.0],
+        "cameraLookat": [5.0, 3.75, 0.0],
+        "isBadApple": true,
+        "badAppleFramesPath": "assets/frames",
+        "badAppleSize": [480, 360],
+        "windowSize": [1440, 1080],
+        "badAppleFrameInterval": 2,
+        "badAppleLoopVideo": true,
+        "numFrames": 9000,
+        "appleWeight": 30.0,
+        "appleDisplaceWeight": 20.0,
+        "appleSpreadStrength": 0.0,
+        "appleTestParams": [1.0, 1.0, 0.0, 0.1],
+        "wallForceDst": 10.0,
+        "wallForceStr": 0.0001,
+        "mouseInteractionRadius": 2.0,
+        "mouseInteractionStrength": 50000.0,
+        "maxVelocityFor2DRender": 25.0,
+        "distThresholdFor2DRender": 500.0
+	},
+	"FluidBlocks": [
+		{
+            "objectId": 0,
+			"start": [-2.0, -1.2],
+			"end": [5.0, 3.2],
+			"translation": [3.5, 2.75],
+			"scale": [1.0, 1.0],
+			"velocity": [0.0, -50.0],
+			"density": 1000.0,
+			"color": [10, 60, 255],
+			"particleSpacing": 2.0
+		}
+	]
+}

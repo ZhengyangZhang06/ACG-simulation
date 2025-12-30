@@ -62,7 +62,7 @@ if __name__ == "__main__":
     export_ply_enabled = config.get_cfg("exportPly", False)
     ply_output_dir = f"output/fluid/{scene_name}/ply_output"
     export_interval = 168
-    max_frames = 13145
+    max_frames = 13444
     
     export_obj_enabled = config.get_cfg("exportObj", False)
     obj_output_dir = f"output/fluid/{scene_name}/mesh_output"
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         if hasattr(solver, 'is_bad_apple') and solver.is_bad_apple:
             current_frame = solver.current_frame_field[None]
             bad_apple_data = {
-                'jfa_results': solver.jfa_results[current_frame],
+                'jfa_results': solver._load_frame_jfa(current_frame),
                 'image_data': solver.frames[current_frame],
                 'size': solver.bad_apple_size
             }
@@ -281,7 +281,7 @@ if __name__ == "__main__":
                 if hasattr(solver, 'is_bad_apple') and solver.is_bad_apple:
                     current_frame = solver.current_frame_field[None]
                     bad_apple_data = {
-                        'jfa_results': solver.jfa_results[current_frame],
+                        'jfa_results': solver._load_frame_jfa(current_frame),
                         'image_data': solver.frames[current_frame],
                         'size': solver.bad_apple_size
                     }

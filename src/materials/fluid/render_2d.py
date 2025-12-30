@@ -134,7 +134,7 @@ class Renderer2D:
                 
                 # Saturation values: deep blue to light blue
                 base_s = 1.0      # Deep blue saturation
-                white_s = 0.03   # Light blue saturation (from white_color)
+                white_s = 0.08   # Light blue saturation (from white_color)
                 
                 target_s = base_s * (1 - t) + white_s * t
                 

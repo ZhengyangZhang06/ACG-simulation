@@ -68,15 +68,16 @@ class WCSPHSolver(SPHBase):
                 frame = np.flipud(frame)
                 frames.append(np.ascontiguousarray(frame.T))
             self.frames = frames  # Keep as list
-            self.jfa_results = []
-            jfa = JumpFloodAlgorithm(self.bad_apple_size[0], self.bad_apple_size[1], 0.5)
-            for frame in self.frames:
-                jfa.run(frame)
-                self.jfa_results.append(jfa.vector_field.to_numpy())
+            # On-demand JFA computation, don't preload all frames (performance optimization)
+            self.jfa = JumpFloodAlgorithm(self.bad_apple_size[0], self.bad_apple_size[1], 0.5)
+            self.jfa_cache = {}  # Cache for recently used frames
+            self.jfa_cache_size = min(2000, self.num_frames)  # Cache at most 2000 frames
+            
             # Create texture for only current frame
             self.bad_apple_tex = ti.Vector.field(4, dtype=ti.f32, shape=(1, self.bad_apple_size[0], self.bad_apple_size[1]))
             # Initialize with first frame
-            self.bad_apple_tex.from_numpy(self.jfa_results[0].reshape(1, self.bad_apple_size[0], self.bad_apple_size[1], 4))
+            self._load_frame_jfa(0)
+            self.bad_apple_tex.from_numpy(self.jfa.vector_field.to_numpy().reshape(1, self.bad_apple_size[0], self.bad_apple_size[1], 4))
             # Initialize image texture
             self.ps.image_tex.from_numpy(self.frames[0].reshape(1, self.bad_apple_size[0], self.bad_apple_size[1]))
             
@@ -203,37 +204,45 @@ class WCSPHSolver(SPHBase):
                 # HLSL: int2 pixelCoord = (int2)(posT * (texSize-1));
                 tex_size = ti.Vector(self.bad_apple_size)
                 pixel_coord = (pos_t * (tex_size - 1)).cast(int)
+                # Boundary protection: ensure sampling coordinates are within valid range
+                pixel_coord[0] = ti.max(0, ti.min(pixel_coord[0], self.bad_apple_size[0] - 1))
+                pixel_coord[1] = ti.max(0, ti.min(pixel_coord[1], self.bad_apple_size[1] - 1))
                 data = self.bad_apple_tex[0, pixel_coord[0], pixel_coord[1]]
                 
                 # HLSL: float2 offset = data.xy - pixelCoord;
-                offset = data[:2] - pixel_coord.cast(float)
-                has_nearest = data[:2].dot(data[:2]) > 0.01
-                offset_len_sq = offset.dot(offset)
                 jfa_distance = data[2]  # Distance in pixels to nearest white pixel
+                
+                # Correct check: verify distance is valid (not the initial infinity)
+                has_nearest = jfa_distance < 1e9
                 
                 # Convert JFA pixel distance to world distance
                 pixels_per_world_unit = tex_size[0] / bounds_size[0]  # Assuming uniform scaling
                 world_distance = jfa_distance / pixels_per_world_unit
                 
+                # offset: vector from current position to nearest white pixel (in pixel coords)
+                offset = data[:2] - pixel_coord.cast(float)
+                offset_len_sq = offset.dot(offset)
+                
                 dir_normalized = ti.Vector([0.0, 0.0])
-                force_multiplier = 1.0
+                force_multiplier = 0.0
                 
                 if has_nearest:
                     # Get local density ratio to determine if area is crowded
                     density_ratio = self.ps.density[p_i] / self.density_0
                     is_crowded = density_ratio > 1.2  # Crowded if density > 120% of rest density
                     
-                    if world_distance > 0.3:  # Far from white region (in black region)
+                    if world_distance > 0.3:  # Far from white region (deep in black region)
                         # Strong attraction toward white region
-                        if offset_len_sq > 0.0001:
+                        if offset_len_sq > 0.00001:
                             dir_normalized = offset.normalized()
                             force_multiplier = 1.0
-                    elif world_distance > 0.0:  # Approaching white region
+                    elif world_distance > 0.00001:  # Approaching white region
                         # Moderate attraction, gradually reduce as getting closer
-                        if offset_len_sq > 0.0001:
+                        if offset_len_sq > 0.00001:
                             dir_normalized = offset.normalized()
-                            # Smooth transition: full force at 0.5, zero at 0.15
-                            force_multiplier = (world_distance - 0.15) / (0.5 - 0.15)
+                            # Smooth transition: full force at 0.3, zero at 0.1
+                            # Ensure force_multiplier is in [0, 1] range
+                            force_multiplier = ti.max(0.0, (world_distance - 0.1) / (0.3 - 0.1))
                     # else:  # Inside white region (world_distance < 0.15)
                     #     # Goal: Move toward boundary (to outline the shape)
                     #     # BUT: Spread out if too crowded
@@ -361,11 +370,15 @@ class WCSPHSolver(SPHBase):
             
             # Respawn if invalid
             if is_invalid:
-                # Better pseudo-random number generation using multiple hash stages
-                # Use frame count as additional entropy source for temporal variation
-                seed = p_i + self.current_frame_field[None] * 10007
+                # Improved pseudo-random number generation: use multiple hashes and more entropy sources
+                # Mix particle ID, frame count, and position info as seed
+                pos_hash = (ti.cast(ti.abs(pos[0]) * 73856093.0, ti.u32) ^ 
+                           ti.cast(ti.abs(pos[1]) * 19349663.0, ti.u32))
+                seed = ti.u32(p_i) * ti.u32(73856093) + \
+                       ti.u32(self.current_frame_field[None]) * ti.u32(19349663) + \
+                       pos_hash * ti.u32(83492791)
                 
-                # Multiple hash stages for better randomness
+                # Multi-stage hashing for better randomness
                 hash1 = (seed * ti.u32(2654435761)) % ti.u32(1000000007)
                 hash2 = (hash1 * ti.u32(1103515245) + ti.u32(12345)) % ti.u32(1000000007)
                 hash3 = (hash2 * ti.u32(134775813) + ti.u32(1)) % ti.u32(1000000007)
@@ -393,6 +406,25 @@ class WCSPHSolver(SPHBase):
                 if self.ps.dim == 3:
                     self.ps.v[p_i][2] = 0.0
 
+    def _load_frame_jfa(self, frame_idx):
+        """Load or compute JFA result for specified frame on-demand"""
+        if frame_idx in self.jfa_cache:
+            return self.jfa_cache[frame_idx]
+        
+        # Compute JFA
+        self.jfa.run(self.frames[frame_idx])
+        result = self.jfa.vector_field.to_numpy()
+        
+        # Add to cache
+        self.jfa_cache[frame_idx] = result
+        
+        # If cache is too large, remove oldest entry
+        if len(self.jfa_cache) > self.jfa_cache_size:
+            oldest_key = min(self.jfa_cache.keys())
+            del self.jfa_cache[oldest_key]
+        
+        return result
+    
     def update_mouse_interaction(self, mouse_x, mouse_y, strength):
         """Update mouse interaction parameters
         Args:
@@ -420,8 +452,8 @@ class WCSPHSolver(SPHBase):
                 
                 self.current_frame_field[None] = next_frame
                 
-                # Update texture with new frame's JFA result
-                result = self.jfa_results[next_frame]
+                # Update texture with new frame's JFA result (on-demand loading)
+                result = self._load_frame_jfa(next_frame)
                 self.bad_apple_tex.from_numpy(result.reshape(1, self.bad_apple_size[0], self.bad_apple_size[1], 4))
                 # Update image texture
                 self.ps.image_tex.from_numpy(self.frames[next_frame].reshape(1, self.bad_apple_size[0], self.bad_apple_size[1]))
