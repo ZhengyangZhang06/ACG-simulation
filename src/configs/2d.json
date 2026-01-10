@@ -17,22 +17,24 @@
 		{
             "objectId": 0,
 			"start": [0.0, 0.0],
-			"end": [2.0, 2.0],
+			"end": [3.0, 3.0],
 			"translation": [2.0, 2.0],
 			"scale": [1.0, 1.0],
-			"velocity": [0.0, -5.0],
+			"velocity": [0.0, -15.0],
 			"density": 1000.0,
-			"color": [0, 0, 255]
+			"color": [0, 0, 255],
+			"particleSpacing": 1.8
 		},
 		{
             "objectId": 0,
 			"start": [0.0, 0.0],
-			"end": [3.0, 5.0],
+			"end": [4.0, 6.0],
 			"translation": [6.0, 3.0],
 			"scale": [1.0, 1.0],
-			"velocity": [0.0, 0.0],
+			"velocity": [0.0, -15.0],
 			"density": 1000.0,
-			"color": [0, 0, 255]
+			"color": [0, 0, 255],
+			"particleSpacing": 1.8
 		}
 	]
 }
