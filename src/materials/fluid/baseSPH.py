@@ -3,14 +3,15 @@ import numpy as np
 
 @ti.data_oriented
 class SPHBase:
-    def __init__(self, particle_system):
+    def __init__(self, particle_system, config):
         self.ps = particle_system
-        self.g = -0.5
-        self.viscosity = 0.00055
-        self.density_0 = 1000.0
-        self.surface_tension = 0.01
+        self.config = config
+        self.g = config.get_cfg("gravity", -9.81)
+        self.viscosity = config.get_cfg("viscosity", 0.01)
+        self.density_0 = config.get_cfg("density0", 1000.0)
+        self.surface_tension = config.get_cfg("surfaceTension", 0.01)
         self.dt = ti.field(float, shape=())
-        self.dt[None] = 0.0001
+        self.dt[None] = config.get_cfg("dt", 0.0001)
         self.h = self.ps.h
 
     @ti.func

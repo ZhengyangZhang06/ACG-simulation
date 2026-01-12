@@ -6,9 +6,9 @@ from JFA import JumpFloodAlgorithm
 
 class WCSPHSolver(SPHBase):
     def __init__(self, particle_system, config):
-        super().__init__(particle_system)
-        self.exponent = 7.0
-        self.stiffness = 50000.0
+        super().__init__(particle_system, config)
+        self.exponent = config.get_cfg("exponent", 7.0)
+        self.stiffness = config.get_cfg("stiffness", 50000.0)
         self.config = config
         self.is_bad_apple = config.get_cfg("isBadApple", False)
         

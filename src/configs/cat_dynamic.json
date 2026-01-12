@@ -9,7 +9,14 @@
         "exportImages": true,
 		"exportObj": true,
         "cameraPosition": [4.5, 2.0, 5.0],
-        "cameraLookat": [-1.0, 0.0, -2.2]
+        "cameraLookat": [-1.0, 0.0, -2.2],
+        "gravity": -9.81,
+        "viscosity": 0.01,
+        "density0": 1000.0,
+        "surfaceTension": 0.01,
+        "dt": 0.0001,
+        "exponent": 7.0,
+        "stiffness": 50000.0
 	},
 	"FluidBlocks": [
 		{
