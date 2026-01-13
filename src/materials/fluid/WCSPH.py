@@ -1,8 +1,8 @@
 import taichi as ti
 import numpy as np
 import os
-from baseSPH import SPHBase
-from JFA import JumpFloodAlgorithm
+from .baseSPH import SPHBase
+from .JFA import JumpFloodAlgorithm
 
 class WCSPHSolver(SPHBase):
     def __init__(self, particle_system, config):

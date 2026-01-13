@@ -2,10 +2,10 @@ import taichi as ti
 import numpy as np
 import os
 import argparse
-from config_builder import SimConfig
-from particle_system import ParticleSystem
-from WCSPH import WCSPHSolver
-from render_2d import Renderer2D
+from configs.config_builder import SimConfig
+from materials.fluid.particle_system import ParticleSystem
+from materials.fluid.WCSPH import WCSPHSolver
+from materials.fluid.render_2d import Renderer2D
 
 ti.init(arch=ti.gpu, device_memory_fraction=0.5)
 

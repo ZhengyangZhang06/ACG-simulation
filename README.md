@@ -77,11 +77,10 @@ blender --version
 
 ### Step 1: Run Fluid Simulation
 ```bash
-python src/materials/fluid/run.py --scene src/configs/basic_fluid.json 
+python src/run.py --scene src/configs/basic_fluid.json 
 ```
 **Output:** `output/fluid/ply_output/*.ply` (particle point clouds for each frame), `output/fluid/images/*.png` (rendered images)
 
-python src/materials/fluid/run.py --scene src/configs/move_rigid.json
 
 ### Step 2: Surface Reconstruction
 ```bash
