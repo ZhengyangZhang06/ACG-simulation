@@ -9,6 +9,7 @@ class WCSPHSolver(SPHBase):
         super().__init__(particle_system, config)
         self.exponent = config.get_cfg("exponent", 7.0)
         self.stiffness = config.get_cfg("stiffness", 50000.0)
+        self.viscosity_b = config.get_cfg("viscosity_b", 0.005)
         self.config = config
         self.is_bad_apple = config.get_cfg("isBadApple", False)
         
@@ -101,12 +102,12 @@ class WCSPHSolver(SPHBase):
             if self.ps.material[p_i] != self.ps.material_fluid:
                 continue
             x_i = self.ps.x[p_i]
-            self.ps.density[p_i] = self.ps.m_V[p_i] * self.cubic_kernel(0.0)
+            self.ps.density[p_i] = self.ps.V[p_i] * self.cubic_kernel(0.0)
             for j in range(self.ps.particle_neighbors_num[p_i]):
                 p_j = self.ps.particle_neighbors[p_i, j]
                 x_j = self.ps.x[p_j]
                 if self.ps.material[p_j] == self.ps.material_fluid or self.ps.material[p_j] == self.ps.material_solid:
-                    self.ps.density[p_i] += self.ps.m_V[p_j] * self.cubic_kernel((x_i - x_j).norm())
+                    self.ps.density[p_i] += self.ps.V[p_j] * self.cubic_kernel((x_i - x_j).norm())
             self.ps.density[p_i] *= self.density_0
 
     @ti.kernel
@@ -129,10 +130,10 @@ class WCSPHSolver(SPHBase):
                 x_j = self.ps.x[p_j]
                 r_ij = x_i - x_j
                 dpi = self.ps.pressure[p_i] / (self.ps.density[p_i] * self.ps.density[p_i])
-                dpj = self.ps.pressure[p_i] / (self.density_0 * self.density_0)
+                dpj = 0.0
                 if self.ps.material[p_j] == self.ps.material_fluid:
                     dpj = self.ps.pressure[p_j] / (self.ps.density[p_j] * self.ps.density[p_j])
-                f_p = -self.density_0 * self.ps.m_V[p_j] * (dpi + dpj) * self.cubic_kernel_derivative(r_ij)
+                f_p = -self.density_0 * self.ps.V[p_j] * (dpi + dpj) * self.cubic_kernel_derivative(r_ij)
                 d_v += f_p
                 if self.ps.is_dynamic_rigid_body(p_j):
                     self.ps.acceleration[p_j] += -f_p * self.density_0 / self.ps.density[p_j]
@@ -320,8 +321,7 @@ class WCSPHSolver(SPHBase):
                         if self.ps.is_dynamic_rigid_body(p_j):
                             self.ps.acceleration[p_j] += -f_v * self.density_0 / self.ps.density[p_j]
                     elif self.ps.material[p_j] == self.ps.material_solid:
-                        boundary_viscosity = 0.0
-                        f_v = d_factor * boundary_viscosity * (self.density_0 * self.ps.m_V[p_j] / self.ps.density[p_i]) * v_ij / (r_ij.norm()**2 + 0.01 * self.h**2) * self.cubic_kernel_derivative(r_ij)
+                        f_v = d_factor * self.viscosity_b * (self.density_0 * self.ps.V[p_j] / self.ps.density[p_i]) * v_ij / (r_ij.norm()**2 + 0.01 * self.h**2) * self.cubic_kernel_derivative(r_ij)
                         d_v += f_v
                         if self.ps.is_dynamic_rigid_body(p_j):
                             self.ps.acceleration[p_j] += -f_v * self.density_0 / self.ps.density[p_j]

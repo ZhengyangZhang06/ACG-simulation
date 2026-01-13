@@ -70,10 +70,7 @@ class SPHBase:
                     if self.ps.material[p_j] == self.ps.material_solid:
                         x_ij = self.ps.x[p_i] - self.ps.x[p_j]
                         delta += self.cubic_kernel(x_ij.norm())
-                if delta > 1e-6:
-                    self.ps.boundary_volume[p_i] = 1.0 / delta
-                else:
-                    self.ps.boundary_volume[p_i] = 0.0
+                self.ps.V[p_i] = 1.0 / delta
 
     @ti.kernel
     def compute_moving_boundary_volume(self):
@@ -86,10 +83,7 @@ class SPHBase:
                 if self.ps.material[p_j] == self.ps.material_solid:
                     x_ij = self.ps.x[p_i] - self.ps.x[p_j]
                     delta += self.cubic_kernel(x_ij.norm())
-            if delta > 1e-6:
-                self.ps.boundary_volume[p_i] = 1.0 / delta * 3.0
-            else:
-                self.ps.boundary_volume[p_i] = 0.0
+            self.ps.V[p_i] = 1.0 / delta
 
     @ti.kernel
     def compute_rigid_rest_cm_kernel(self, object_id: int):
@@ -97,7 +91,7 @@ class SPHBase:
         cm = ti.Vector([0.0 for _ in range(self.ps.dim)])
         for p_i in range(self.ps.particle_num[None]):
             if self.ps.material[p_i] == self.ps.material_solid and self.ps.object_id[p_i] == object_id:
-                mass = self.ps.m_V0 * self.ps.density[p_i]
+                mass = self.ps.V0 * self.ps.density[p_i]
                 cm += mass * self.ps.x_0[p_i]
                 sum_m += mass
         if sum_m > 1e-6:
@@ -174,7 +168,7 @@ class SPHBase:
         cm = ti.Vector([0.0 for _ in range(self.ps.dim)])
         for p_i in range(self.ps.particle_num[None]):
             if self.ps.is_dynamic_rigid_body(p_i) and self.ps.object_id[p_i] == object_id:
-                mass = self.ps.m_V0 * self.ps.density[p_i]
+                mass = self.ps.V0 * self.ps.density[p_i]
                 cm += mass * self.ps.x[p_i]
                 sum_m += mass
         if sum_m > 1e-6:
@@ -193,7 +187,7 @@ class SPHBase:
             if self.ps.is_dynamic_rigid_body(p_i) and self.ps.object_id[p_i] == object_id:
                 q = self.ps.x_0[p_i] - self.ps.rigid_rest_cm[object_id]
                 p = self.ps.x[p_i] - cm
-                A += self.ps.m_V0 * self.ps.density[p_i] * p.outer_product(q)
+                A += self.ps.V0 * self.ps.density[p_i] * p.outer_product(q)
 
         R, S = ti.polar_decompose(A)
 

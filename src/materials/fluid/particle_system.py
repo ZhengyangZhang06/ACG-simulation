@@ -19,7 +19,7 @@ class ParticleSystem:
         self.particle_radius = self.cfg.get_cfg("particleRadius")
         self.particle_diameter = 2 * self.particle_radius
         self.h = self.particle_radius * 4.0
-        self.m_V0 = 0.8 * self.particle_diameter ** self.dim
+        self.V0 = 0.8 * self.particle_diameter ** self.dim
         self.grid_size = self.h
         self.grid_num = np.ceil(self.domain_size / self.grid_size).astype(int)
         self.particle_max_num_per_cell = 100
@@ -76,7 +76,7 @@ class ParticleSystem:
         self.acceleration = ti.Vector.field(self.dim, dtype=float, shape=self.particle_max_num)
         self.density = ti.field(dtype=float, shape=self.particle_max_num)
         self.pressure = ti.field(dtype=float, shape=self.particle_max_num)
-        self.m_V = ti.field(dtype=float, shape=self.particle_max_num)
+        self.V = ti.field(dtype=float, shape=self.particle_max_num)
         self.m = ti.field(dtype=float, shape=self.particle_max_num)
         self.material = ti.field(dtype=int, shape=self.particle_max_num)
         self.is_dynamic = ti.field(dtype=int, shape=self.particle_max_num)
@@ -87,9 +87,6 @@ class ParticleSystem:
         self.padding = self.particle_radius
         num_rigid_bodies = len(rigid_bodies) + 10
         self.rigid_rest_cm = ti.Vector.field(self.dim, dtype=float, shape=num_rigid_bodies)
-        
-        # Boundary volume for fluid-solid coupling
-        self.boundary_volume = ti.field(dtype=float, shape=self.particle_max_num)
 
         # Neighbor search
         self.particle_neighbors = ti.field(int, shape=(self.particle_max_num, self.particle_max_num_neighbor))
@@ -219,8 +216,8 @@ class ParticleSystem:
             self.acceleration[p] = ti.Vector([0.0 for _ in range(self.dim)])
             self.density[p] = density
             self.pressure[p] = 0.0
-            self.m_V[p] = self.m_V0
-            self.m[p] = self.m_V0 * density
+            self.V[p] = self.V0
+            self.m[p] = self.V0 * density
             self.material[p] = material
             self.is_dynamic[p] = is_dynamic
             self.object_id[p] = object_id
