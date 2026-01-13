@@ -22,8 +22,8 @@
       "linearDamping": 0.01,
       "angularDamping": 0.02,
       "material": {
-        "materialName": "Metal",
-        "materialFile": "assets/materials/metal.blend"
+        "materialName": "red",
+        "materialFile": "assets/materials/plastics.blend"
       }
     },
     {
@@ -37,8 +37,8 @@
       "linearDamping": 0.01,
       "angularDamping": 0.02,
       "material": {
-        "materialName": "Metal",
-        "materialFile": "assets/materials/metal.blend"
+        "materialName": "blue",
+        "materialFile": "assets/materials/plastics.blend"
       }
     },
     {
@@ -52,8 +52,8 @@
       "linearDamping": 0.01,
       "angularDamping": 0.02,
       "material": {
-        "materialName": "Metal",
-        "materialFile": "assets/materials/metal.blend"
+        "materialName": "yellow",
+        "materialFile": "assets/materials/plastics.blend"
       }
     }
   ],
