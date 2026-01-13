@@ -245,8 +245,9 @@ def main() -> None:
     # Set global paths based on config
     global MESH_DIRECTORY, OUTPUT_DIR
     scene_name = config_path.stem  # Use config filename as scene name
-    MESH_DIRECTORY = Path(f"output/fluid/{scene_name}/mesh_output")
-    OUTPUT_DIR = Path(f"output/fluid/{scene_name}/render")
+    
+    MESH_DIRECTORY = Path(f"output/{scene_name}/mesh_output")
+    OUTPUT_DIR = Path(f"output/{scene_name}/render")
 
     print("=" * 60)
     print("Render OBJ Sequence to Images")
@@ -259,26 +260,27 @@ def main() -> None:
     print(f"FPS: {fps}")
     print("=" * 60)
 
-    # Find fluid OBJ files
+    # Find fluid OBJ files (if exists)
     fluid_pattern = "fluid_*.obj"
     fluid_files = sorted(MESH_DIRECTORY.glob(fluid_pattern))
-    if not fluid_files:
-        print(f"No fluid OBJ files found in {MESH_DIRECTORY} with pattern {fluid_pattern}")
-        sys.exit(1)
+    if fluid_files:
+        print(f"Found {len(fluid_files)} fluid OBJ files")
+    else:
+        print("No fluid OBJ files found")
 
     # Find rigid body OBJ files (in obj_1, obj_2, etc. subdirectories)
     rigid_files_list = []
     for i, rb in enumerate(rigid_bodies):
-        rigid_dir = MESH_DIRECTORY / f"obj_{i+1}"
-        rigid_pattern = f"obj_{i+1}_*.obj"
+        object_id = rb.get("objectId", i+1)
+        rigid_dir = MESH_DIRECTORY / f"obj_{object_id}"
+        rigid_pattern = f"obj_{object_id}_*.obj"
         rigid_files = sorted(rigid_dir.glob(rigid_pattern)) if rigid_dir.exists() else []
         rigid_files_list.append(rigid_files)
-        print(f"Found {len(rigid_files)} rigid body OBJ files for obj_{i+1}")
-
-    print(f"Found {len(fluid_files)} fluid OBJ files")
+        if rigid_files:
+            print(f"Found {len(rigid_files)} rigid body OBJ files for obj_{object_id}")
 
     # Determine the number of frames to process
-    all_files = [len(fluid_files)] + [len(rf) for rf in rigid_files_list]
+    all_files = ([len(fluid_files)] if fluid_files else []) + [len(rf) for rf in rigid_files_list]
     max_frames = max(all_files) if all_files else 0
     if max_frames == 0:
         print("No OBJ files found")
@@ -290,7 +292,7 @@ def main() -> None:
 
     # Process each frame
     for i in range(args.start_obj, max_frames):
-        fluid_path = fluid_files[i] if i < len(fluid_files) else None
+        fluid_path = fluid_files[i] if fluid_files and i < len(fluid_files) else None
         rigid_paths = [rf[i] if i < len(rf) else None for rf in rigid_files_list]
 
         print(f"Processing frame {i}/{max_frames}: fluid={fluid_path.name if fluid_path else 'None'}, rigids={[rp.name if rp else 'None' for rp in rigid_paths]}")

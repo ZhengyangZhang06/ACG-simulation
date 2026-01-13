@@ -1,0 +1,46 @@
+{
+  "Configuration": {
+    "simulationType": "rigid_body",
+    "RigidBodySimulation": {
+      "duration": 6.0,
+      "dt": 0.00833333,
+      "gravity": [0.0, -9.81, 0.0],
+      "groundHeight": 0.0,
+      "groundFriction": 0.4,
+      "enableBodyCollisions": false
+    }
+  },
+  "RigidBodies": [
+    {
+      "objectId": 1,
+      "mass": 1.5,
+      "size": [0.6, 0.6, 0.6],
+      "position": [0.0, 2.5, 0.0],
+      "velocity": [0.0, 0.0, 0.0],
+      "angularVelocity": [0.0, 0.0, 0.0],
+      "orientation": {
+        "eulerDegrees": [25.0, 0.0, 35.0]
+      },
+      "restitution": 0.35,
+      "linearDamping": 0.01,
+      "angularDamping": 0.02,
+      "material": {
+        "materialName": "Metal",
+        "materialFile": "assets/materials/metal.blend"
+      }
+    }
+  ],
+  "Lights": [
+    {
+      "position": [5.0, 5.0, 5.0],
+      "color": [1.0, 1.0, 1.0]
+    }
+  ],
+  "Render": {
+    "fps": 60,
+    "totalFrames": 720,
+    "cameraLocation": [5.0, 3.0, 5.0],
+    "cameraRotation": [1.0, 0.0, 0.8],
+    "cameraLens": 50
+  }
+}
