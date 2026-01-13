@@ -90,11 +90,11 @@ python src/blender/reconstruct_surface.py
 
 ### Step 3: Import to Blender and Render Animation
 ```bash
-blender --background --python src/blender/render.py
+blender --background --python src/blender/render.py -- --scene src/configs/basic_fluid.json
 ```
 To resume rendering from a specific OBJ index (useful for large sequences):
 ```bash
-blender --background --python src/blender/render.py -- --scene cat_dynamic --start-obj 100
+blender --background --python src/blender/render.py -- --scene src/configs/cat_dynamic.json --start-obj 100
 ```
 **Output:** `output/fluid/render/frame_XXXX.png` (rendered PNG image sequence)
 
