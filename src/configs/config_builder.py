@@ -40,3 +40,14 @@ class SimConfig:
         else:
             return []
         
+    def get_lights(self):
+        if "Lights" in self.config:
+            return self.config["Lights"]
+        else:
+            return [{"position": [2.0, 2.0, 2.0], "color": [1.0, 1.0, 1.0]}]
+    
+    def get_render(self):
+        if "Render" in self.config:
+            return self.config["Render"]
+        else:
+            return {"fps": 60, "totalFrames": 300}

@@ -44,6 +44,10 @@
 			"color": [255, 100, 50], 
 			"isDynamic": true
 		}
-	]
+	],
+	"Render": {
+		"fps": 60,
+		"totalFrames": 300
+	}
 }
 

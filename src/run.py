@@ -5,7 +5,7 @@ import argparse
 from configs.config_builder import SimConfig
 from materials.fluid.particle_system import ParticleSystem
 from materials.fluid.WCSPH import WCSPHSolver
-from materials.fluid.render_2d import Renderer2D
+from blender.render_2d import Renderer2D
 
 ti.init(arch=ti.gpu, device_memory_fraction=0.5)
 
@@ -46,6 +46,10 @@ def export_obj(ps, frame, output_dir, obj_id):
         filtered_lines = [line for line in lines if not line.startswith(('mtllib', 'usemtl'))]
         f.write('\n'.join(filtered_lines))
 
+def setup_lights(scene, lights_config):
+    for light in lights_config:
+        scene.point_light(tuple(light["position"]), color=tuple(light["color"]))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SPH Taichi')
     parser.add_argument('--scene_file',
@@ -54,26 +58,41 @@ if __name__ == "__main__":
     args = parser.parse_args()
     scene_path = args.scene_file
     config = SimConfig(scene_file_path=scene_path)
+    lights_config = config.get_lights()
+    render_config = config.get_render()
     scene_name = scene_path.split("/")[-1].split(".")[0]
     ps = ParticleSystem(config)
     solver = WCSPHSolver(ps, config)
     solver.initialize()
 
+    # Calculate export intervals based on target fps
+    number_of_steps_per_render = config.get_cfg("numberOfStepsPerRenderUpdate", 1)
+    dt = config.get_cfg("dt", 0.0001)
+    fps = render_config.get("fps", 60)
+    render_fps = 1 / (number_of_steps_per_render * dt)  # Render frames per second
+    export_interval = int(render_fps / fps)
+
     export_ply_enabled = config.get_cfg("exportPly", False)
     ply_output_dir = f"output/fluid/{scene_name}/ply_output"
-    export_interval = 168
-    max_frames = 13444
     
     export_obj_enabled = config.get_cfg("exportObj", False)
     obj_output_dir = f"output/fluid/{scene_name}/mesh_output"
     
     export_images_enabled = config.get_cfg("exportImages", False)
     image_output_dir = f"output/fluid/{scene_name}/images"
-    image_interval = 84
+    image_interval = export_interval  # Same as ply/obj
     
     export_2d_renders = config.get_cfg("export2DRenders", False)
     render_2d_output_dir = f"output/fluid/{scene_name}/render"
-    render_2d_interval = 84
+    if solver.is_bad_apple:
+        render_2d_interval = number_of_steps_per_render * (fps / 60)
+        # For badapple, max_frames is num_frames * badAppleFrameInterval
+        bad_apple_frame_interval = config.get_cfg("badAppleFrameInterval", 2)
+        max_frames = solver.num_frames * bad_apple_frame_interval
+        export_interval = render_2d_interval
+    else:
+        render_2d_interval = export_interval
+        max_frames = render_config.get("totalFrames", 300)
     
     show_window = not export_images_enabled
     
@@ -142,53 +161,6 @@ if __name__ == "__main__":
     frame_count = 0
     image_frame_count = 0
     render_2d_frame_count = 0
-    
-    # Export initial frame (frame 0) before simulation starts
-    ps.copy_to_vis_buffer()
-    scene.particles(ps.x_vis_buffer, radius=ps.particle_radius, per_vertex_color=ps.color_vis_buffer, per_vertex_radius=ps.radius_vis_buffer)
-    scene.lines(box_anchors, indices=box_lines_indices, color=(0.99, 0.68, 0.28), width=1.0)
-    scene.point_light((5.0, 3.75, 2.0), color=(1.0, 1.0, 1.0))
-    scene.point_light((0.5, 0.5, 2.0), color=(1.0, 1.0, 1.0))
-    scene.point_light((0.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
-    scene.point_light((9.5, 0.5, 2.0), color=(1.0, 1.0, 1.0))
-    scene.point_light((9.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
-    canvas.scene(scene)
-    if export_ply_enabled:
-        export_ply(ps, frame_count, ply_output_dir, obj_id=0)
-        print(f"Exported PLY frame {frame_count}")
-    if export_obj_enabled:
-        for r_body_id in ps.object_id_rigid_body:
-            export_obj(ps, frame_count, obj_output_dir, r_body_id)
-        if len(ps.object_id_rigid_body) > 0:
-            print(f"Exported OBJ frame {frame_count}")
-    if export_images_enabled and image_frame_count < max_frames:
-        window.save_image(os.path.join(image_output_dir, f"frame_{image_frame_count:04d}.png"))
-        print(f"Exported image frame {image_frame_count}")
-        image_frame_count += 1
-    if export_2d_renders and render_2d_frame_count < max_frames:
-        particles_data = {
-            'positions': ps.x.to_numpy()[:ps.particle_num[None], :2],
-            'velocities': ps.v.to_numpy()[:ps.particle_num[None], :2],
-            'radius': ps.particle_radius
-        }
-        bad_apple_data = None
-        render_config = None
-        if hasattr(solver, 'is_bad_apple') and solver.is_bad_apple:
-            current_frame = solver.current_frame_field[None]
-            bad_apple_data = {
-                'jfa_results': solver._load_frame_jfa(current_frame),
-                'image_data': solver.frames[current_frame],
-                'size': solver.bad_apple_size
-            }
-            render_config = {
-                'maxVelocityFor2DRender': config.get_cfg('maxVelocityFor2DRender', 50.0),
-                'distThresholdFor2DRender': config.get_cfg('distThresholdFor2DRender', 10.0)
-            }
-        renderer_2d.render_frame(particles_data, render_2d_frame_count, bad_apple_data, render_config)
-        print(f"Exported 2D render frame {render_2d_frame_count}")
-        render_2d_frame_count += 1
-    frame_count += 1
-    
     # Mouse interaction settings
     mouse_interaction_strength = config.get_cfg("mouseInteractionStrength", 100.0)
 
@@ -218,35 +190,14 @@ if __name__ == "__main__":
                 strength = -mouse_interaction_strength
             
             solver.update_mouse_interaction(world_x, world_y, strength)
-        
-        for i in range(config.get_cfg("numberOfStepsPerRenderUpdate") or 1):
-            solver.step()
-            step_count += 1
-            
-            if (export_ply_enabled or export_obj_enabled) and step_count % export_interval == 0:
-                if frame_count < max_frames:
-                    if export_ply_enabled:
-                        export_ply(ps, frame_count, ply_output_dir, obj_id=0)
-                        print(f"Exported PLY frame {frame_count}")
-                    if export_obj_enabled:
-                        for r_body_id in ps.object_id_rigid_body:
-                            export_obj(ps, frame_count, obj_output_dir, r_body_id)
-                        if len(ps.object_id_rigid_body) > 0:
-                            print(f"Exported OBJ frame {frame_count}")
-                    frame_count += 1
-            
+                   
         ps.copy_to_vis_buffer()
 
         if show_window:
             camera.track_user_inputs(window, movement_speed=movement_speed, hold_key=ti.ui.MMB)
         scene.set_camera(camera)
 
-        # scene.point_light((2.0, 2.0, 2.0), color=(1.0, 1.0, 1.0))
-        scene.point_light((5.0, 3.75, 2.0), color=(1.0, 1.0, 1.0))
-        scene.point_light((0.5, 0.5, 2.0), color=(1.0, 1.0, 1.0))
-        scene.point_light((0.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
-        scene.point_light((9.5, 0.5, 2.0), color=(1.0, 1.0, 1.0))
-        scene.point_light((9.5, 7.0, 2.0), color=(1.0, 1.0, 1.0))
+        setup_lights(scene, lights_config)
         scene.particles(ps.x_vis_buffer, radius=ps.particle_radius, per_vertex_color=ps.color_vis_buffer, per_vertex_radius=ps.radius_vis_buffer)
         scene.lines(box_anchors, indices=box_lines_indices, color=(0.99, 0.68, 0.28), width=1.0)
         canvas.scene(scene)
@@ -255,6 +206,18 @@ if __name__ == "__main__":
             window.show()
 
         # Export after rendering
+        if (export_ply_enabled or export_obj_enabled) and step_count % export_interval == 0:
+            if frame_count < max_frames:
+                if export_ply_enabled:
+                    export_ply(ps, frame_count, ply_output_dir, obj_id=0)
+                    print(f"Exported PLY frame {frame_count}")
+                if export_obj_enabled:
+                    for r_body_id in ps.object_id_rigid_body:
+                        export_obj(ps, frame_count, obj_output_dir, r_body_id)
+                    if len(ps.object_id_rigid_body) > 0:
+                        print(f"Exported OBJ frame {frame_count}")
+                frame_count += 1
+        
         if export_images_enabled and step_count % image_interval == 0:
             if image_frame_count < max_frames:
                 window.save_image(os.path.join(image_output_dir, f"frame_{image_frame_count:04d}.png"))
@@ -277,7 +240,7 @@ if __name__ == "__main__":
                 
                 # Check if Bad Apple mode
                 bad_apple_data = None
-                render_config = None
+                render_config_local = None
                 if hasattr(solver, 'is_bad_apple') and solver.is_bad_apple:
                     current_frame = solver.current_frame_field[None]
                     bad_apple_data = {
@@ -285,15 +248,19 @@ if __name__ == "__main__":
                         'image_data': solver.frames[current_frame],
                         'size': solver.bad_apple_size
                     }
-                    render_config = {
+                    render_config_local = {
                         'maxVelocityFor2DRender': config.get_cfg('maxVelocityFor2DRender', 50.0),
                         'distThresholdFor2DRender': config.get_cfg('distThresholdFor2DRender', 10.0)
                     }
                 
-                renderer_2d.render_frame(particles_data, render_2d_frame_count, bad_apple_data, render_config)
+                renderer_2d.render_frame(particles_data, render_2d_frame_count, bad_apple_data, render_config_local)
                 print(f"Exported 2D render frame {render_2d_frame_count}")
                 render_2d_frame_count += 1
         
+        for i in range(config.get_cfg("numberOfStepsPerRenderUpdate") or 1):
+            solver.step()
+            step_count += 1
+            
         if ((export_ply_enabled or export_obj_enabled) and frame_count >= max_frames) or (export_images_enabled and image_frame_count >= max_frames) or (export_2d_renders and render_2d_frame_count >= max_frames):
             break
 
