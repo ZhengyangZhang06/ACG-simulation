@@ -82,27 +82,26 @@ python src/run.py --scene src/configs/basic_fluid.json
 **Output:** `output/fluid/ply_output/*.ply` (particle point clouds for each frame), `output/fluid/images/*.png` (rendered images)
 
 
-### Step 2: Surface Reconstruction
+### Step 2: Surface Reconstruction (no need for rigid simulation)
 ```bash
-python src/blender/reconstruct_surface.py
+python src/render/reconstruct_surface.py
 ```
-
 
 ### Step 3: Import to Blender and Render Animation
 ```bash
-blender --background --python src/blender/render.py -- --scene src/configs/basic_fluid.json
+blender --background --python src/render/render_blender.py -- --scene src/configs/basic_fluid.json
 ```
 To resume rendering from a specific OBJ index (useful for large sequences):
 ```bash
-blender --background --python src/blender/render.py -- --scene src/configs/cat_dynamic.json --start-obj 100
+blender --background --python src/render/render_blender.py -- --scene src/configs/cat_dynamic.json --start-obj 100
 ```
-**Output:** `output/fluid/render/frame_XXXX.png` (rendered PNG image sequence)
+**Output:** `output/{scene_name}/render/frame_XXXX.png` (rendered PNG image sequence)
 
-### Step 3: Create Video
+### Step 4: Create Video
 ```bash
-python src/blender/create_video.py
+python src/render/create_video.py
 ```
-**Output:** `output/fluid/fluid_animation.mp4` (final video)
+**Output:** `output/{scene_name}/fluid_animation.mp4` (final video)
 
 ### References
 [SPH](https://dl.acm.org/doi/10.5555/846276.846298)
