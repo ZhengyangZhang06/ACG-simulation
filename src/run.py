@@ -6,7 +6,7 @@ from pathlib import Path
 from configs.config_builder import SimConfig
 from materials.fluid.particle_system import ParticleSystem
 from materials.fluid.WCSPH import WCSPHSolver
-from blender.render_2d import Renderer2D
+from render.render_2d import Renderer2D
 
 # Check if simulation is rigid body (no taichi needed)
 def is_rigid_body_sim(scene_path):

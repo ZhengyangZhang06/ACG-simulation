@@ -42,7 +42,7 @@ blender --version
 
 ## Usage
 
-### Step 1: Run Fluid Simulation
+### Step 1: Run Fluid / Rigid Simulation
 ```bash
 python src/run.py --scene src/configs/basic_fluid.json 
 ```
@@ -71,6 +71,7 @@ python src/render/create_video.py
 **Output:** `output/{scene_name}/fluid_animation.mp4` (final video)
 
 ## Output Structure
+```
 output/{scene_name}/
 ├── mesh_output/
 │   ├── fluid_*.obj (only for fluid scene)
@@ -79,6 +80,7 @@ output/{scene_name}/
 ├── ply_output/ (only for fluid scene)
 ├── images/ (only for fluid scene)
 └── render/
+```
 
 
 ### References
