@@ -111,6 +111,7 @@ python src/run.py --scene src/configs/2d.json
 Press the left mouse button to apply attractive force to the water, right button for repulsive force.
 
 ### Bad Apple Fluid Simulation
+You need to fetch the orginal frames of the video first.
 ```bash
 python src/run.py --scene src/configs/badapple_small.json
 ```
