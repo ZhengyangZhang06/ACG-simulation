@@ -140,8 +140,7 @@ Fluid simulation coupling with a move rigid body.
 "Bad Apple" fluid simulation with a clear water wave.
 ![wave](demos/wave.png)
 
-
-All the complete demos and rendered videos are available at [tsinghua cloud](https://cloud.tsinghua.edu.cn/d/d7a64a11f1b3435c959f/). The "Bad Apple" fluid simulation animation is uploaded to [bilibili](https://www.bilibili.com/video/BV1XZv8BZE21/?share_source=copy_web&vd_source=219034b02a3fee6a10687b0a949d28fc).
+Compressed demos are in `demos/`, all the uncompressed raw and rendered demos are available at [tsinghua cloud](https://cloud.tsinghua.edu.cn/d/d7a64a11f1b3435c959f/). The "Bad Apple" fluid simulation animation is uploaded to [bilibili](https://www.bilibili.com/video/BV1XZv8BZE21/?share_source=copy_web&vd_source=219034b02a3fee6a10687b0a949d28fc).
 
 
 ## References
