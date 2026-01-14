@@ -51,7 +51,7 @@ python src/run.py --scene src/configs/basic_fluid.json
 
 ### Step 2: Surface Reconstruction (no need for rigid simulation)
 ```bash
-python src/render/reconstruct_surface.py
+python src/render/reconstruct_surface.py --scene src/configs/cat_float.json
 ```
 
 ### Step 3: Import to Blender and Render Animation
@@ -66,9 +66,12 @@ blender --background --python src/render/render_blender.py -- --scene src/config
 
 ### Step 4: Create Video
 ```bash
-python src/render/create_video.py
+python src/render/create_video.py -i output/high_water/images -o output/high_water/raw.mp4 --fps 60
 ```
-**Output:** `output/{scene_name}/fluid_animation.mp4` (final video)
+```bash
+python src/render/create_video.py -i output/high_water/render -o output/high_water/animation.mp4 --fps 60
+```
+**Output:** `output/{scene_name}/animation.mp4` (final video)
 
 ## Output Structure
 ```
