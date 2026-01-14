@@ -1,5 +1,12 @@
 # ACG-simulation
 
+## Overview
+This project implement a comprehensive physics simulation system, focusing on the interaction between Smoothed Particle Hydrodynamics (SPH) fluids and rigid bodies. We implemented a basic 2D and 3D Weakly Compressible SPH (WCSPH) fluid simulator with robust fluid-solid coupling, reconstructed fluid surfaces, and rendered high-quality results using Blender. 
+
+Furthermore, we developed a multithreaded rigid body simulator, a real-time interactive 2D playground, and a creative ``Bad Apple'' fluid animation driven by distance fields. The system demonstrates significant acceleration through GPU computing and algorithmic optimizations.
+
+Most codes are written in Taichi language.
+
 ## Environment Setup
 
 ### Conda Environment
@@ -40,40 +47,49 @@ python -c "import taichi as ti; print('Taichi version:', ti.__version__)"
 blender --version
 ```
 
-## Usage
+
+## Usage for Standard Simulation Pipeline
 
 ### Step 1: Run Fluid / Rigid Simulation
 ```bash
-python src/run.py --scene src/configs/basic_fluid.json 
+python src/run.py --scene src/configs/{scene_name}.json 
 ```
-**Output:** `output/{scene_name}/ply_output/*.ply` (particle point clouds for each frame), `output/{scene_name}/images/*.png` (rendered images)
+**Output:** 
+- `output/{scene_name}/ply_output/*.ply`: particle point clouds for each frame, only for fluid;
+- `output/{scene_name}/mesh_output/obj_{objectId}/obj_{objectId}_*.obj`: meshes of rigid bodies;
+- `output/{scene_name}/images/*.png`: raw particle images.
 
 
 ### Step 2: Surface Reconstruction (no need for rigid simulation)
 ```bash
-python src/render/reconstruct_surface.py --scene src/configs/cat_float.json
+python src/render/reconstruct_surface.py --scene src/configs/{scene_name}.json --surface-threshold 0.6
 ```
+
 
 ### Step 3: Import to Blender and Render Animation
 ```bash
-blender --background --python src/render/render_blender.py -- --scene src/configs/basic_fluid.json
+blender --background --python src/render/render_blender.py -- --scene src/configs/{scene_name}.json
 ```
 To resume rendering from a specific OBJ index (useful for large sequences):
 ```bash
-blender --background --python src/render/render_blender.py -- --scene src/configs/cat_dynamic.json --start-obj 100
+blender --background --python src/render/render_blender.py -- --scene src/configs/{scene_name}.json --start-obj 100
 ```
-**Output:** `output/{scene_name}/render/frame_XXXX.png` (rendered PNG image sequence)
+**Output:** 
+- `output/{scene_name}/render/*.png`: Blender rendered PNG image sequence
+
 
 ### Step 4: Create Video
 ```bash
-python src/render/create_video.py -i output/high_water/images -o output/high_water/raw.mp4 --fps 60
+python src/render/create_video.py -i output/{scene_name}/images -o output/{scene_name}/raw.mp4 --fps 60
 ```
 ```bash
-python src/render/create_video.py -i output/high_water/render -o output/high_water/animation.mp4 --fps 60
+python src/render/create_video.py -i output/{scene_name}/render -o output/{scene_name}/animation.mp4 --fps 60
 ```
-**Output:** `output/{scene_name}/animation.mp4` (final video)
+**Output:** 
+- `output/{scene_name}/raw.mp4`: video of raw particles.
+- `output/{scene_name}/animation.mp4`: final Blender rendered video.
 
-## Output Structure
+### Output Structure
 ```
 output/{scene_name}/
 ├── mesh_output/
@@ -86,15 +102,59 @@ output/{scene_name}/
 ```
 
 
-### References
+## Usage for Custom Features
+
+### Realtime Interactive Play Ground
+```bash
+python src/run.py --scene src/configs/2d.json
+```
+Press the left button of mouse to address attractive force to water, right button for repulsive force.
+
+### Bad Apple Fluid Simulation
+```bash
+python src/run.py --scene src/configs/badapple_small.json
+```
+Set `"exportImages": false,` and `"export2DRenders": false,` to see the raw particles effect and play with realtime mouse force. Set `"exportImages": true,` and `"export2DRenders": true,` to get raw and rendered images output. Then, create the video.
+```bash
+python src/render/create_video.py -i output/badapple_small/images -o output/badapple_small/raw.mp4 --fps 60
+```
+```bash
+python src/render/create_video.py -i output/badapple_small/render -o output/badapple_small/animation.mp4 --fps 60
+```
+**Output:** 
+- `output/badapple_small/raw.mp4`: video of raw particles.
+- `output/badapple_small/animation.mp4`: final Blender rendered video.
+
+
+## Demonstration
+Basic fluid standard dam-break scenario.
+![fluid](demos/fluid.png)
+
+Fluid simulation coupling with a fix rigid body.
+![dragon](demos/dragon.png)
+
+Fluid simulation coupling with a move rigid body.
+![cat](demos/cat.png)
+![bunny](demos/bunny.png)
+
+"Bad Apple" fluid simulation with a clear ater wave.
+![wave](demos/wave.png)
+
+
+All the complete demos and rendered videos are available at [tsinghua cloud](https://cloud.tsinghua.edu.cn/d/d7a64a11f1b3435c959f/). The "Bad Apple" fluid simulation animation is uploaded to [bilibili](https://www.bilibili.com/video/BV1XZv8BZE21/?share_source=copy_web&vd_source=219034b02a3fee6a10687b0a949d28fc).
+
+
+## References
 [SPH](https://dl.acm.org/doi/10.5555/846276.846298)
 
 [WCSPH](https://dl.acm.org/doi/10.5555/1272690.1272719)
 
-[PCISPH](https://dl.acm.org/doi/abs/10.1145/1576246.1531346)
-
-[DFSPH](https://dl.acm.org/doi/10.1145/2786784.2786796)
-
 [rigid-fluid Coupling](https://dl.acm.org/doi/10.1145/2185520.2185558)
 
 [SPH_Taichi](https://github.com/erizmr/SPH_Taichi)
+
+[JFA algorithm](https://dl.acm.org/doi/abs/10.1145/1111411.1111431)
+
+[Bad Apple!! video](https://youtu.be/i41KoE0iMYU)
+
+[Bad Apple!! fluid simulation video](https://youtu.be/2Ni13dnAbSA?si=00X1fgYde82hsCPX)
