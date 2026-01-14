@@ -1,11 +1,11 @@
 # ACG-simulation
 
 ## Overview
-This project implement a comprehensive physics simulation system, focusing on the interaction between Smoothed Particle Hydrodynamics (SPH) fluids and rigid bodies. We implemented a basic 2D and 3D Weakly Compressible SPH (WCSPH) fluid simulator with robust fluid-solid coupling, reconstructed fluid surfaces, and rendered high-quality results using Blender. 
+This project implements a comprehensive physics simulation system, focusing on the interaction between Smoothed Particle Hydrodynamics (SPH) fluids and rigid bodies. We implemented a basic 2D and 3D Weakly Compressible SPH (WCSPH) fluid simulator with robust fluid-solid coupling, reconstructed fluid surfaces, and rendered high-quality results using Blender. 
 
 Furthermore, we developed a multithreaded rigid body simulator, a real-time interactive 2D playground, and a creative ``Bad Apple'' fluid animation driven by distance fields. The system demonstrates significant acceleration through GPU computing and algorithmic optimizations.
 
-Most codes are written in Taichi language.
+Most code is written in Taichi language.
 
 ## Environment Setup
 
@@ -104,11 +104,11 @@ output/{scene_name}/
 
 ## Usage for Custom Features
 
-### Realtime Interactive Play Ground
+### Realtime Interactive Playground
 ```bash
 python src/run.py --scene src/configs/2d.json
 ```
-Press the left button of mouse to address attractive force to water, right button for repulsive force.
+Press the left mouse button to apply attractive force to the water, right button for repulsive force.
 
 ### Bad Apple Fluid Simulation
 ```bash
@@ -137,7 +137,7 @@ Fluid simulation coupling with a move rigid body.
 ![cat](demos/cat.png)
 ![bunny](demos/bunny.png)
 
-"Bad Apple" fluid simulation with a clear ater wave.
+"Bad Apple" fluid simulation with a clear water wave.
 ![wave](demos/wave.png)
 
 
@@ -145,8 +145,6 @@ All the complete demos and rendered videos are available at [tsinghua cloud](htt
 
 
 ## References
-[SPH](https://dl.acm.org/doi/10.5555/846276.846298)
-
 [WCSPH](https://dl.acm.org/doi/10.5555/1272690.1272719)
 
 [rigid-fluid Coupling](https://dl.acm.org/doi/10.1145/2185520.2185558)
