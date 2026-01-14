@@ -2,28 +2,13 @@
 Combine PNG sequence into video using ffmpeg.
 
 Usage:
-    python create_video.py
-
-Requirements:
-    ffmpeg must be installed (sudo apt install ffmpeg)
+    python src/render/create_video.py -i output/high_water/images -o output/rigid_complex/raw.mp4 --fps 60
 """
 
 import subprocess
 import sys
+import argparse
 from pathlib import Path
-
-# --- Configuration ---------------------------------------------------------
-INPUT_DIR = Path("output/fluid/dragon_bath/render")  # Directory containing PNG frames
-INPUT_PATTERN = "frame_%04d.png"              # ffmpeg pattern for numbered frames
-OUTPUT_FILE = Path("output/fluid/dragon_bath/fluid_animation.mp4")
-
-# Video settings
-FPS = 60
-CODEC = "libx264"                             # H.264 codec
-PIXEL_FORMAT = "yuv420p"                      # Compatible with most players
-CRF = 18                                      # Quality (0-51, lower = better, 18-23 recommended)
-PRESET = "medium"                             # Encoding speed: ultrafast, fast, medium, slow, veryslow
-# ---------------------------------------------------------------------------
 
 
 def check_ffmpeg() -> bool:
@@ -39,26 +24,26 @@ def check_ffmpeg() -> bool:
         return False
 
 
-def count_frames() -> int:
+def count_frames(input_dir: Path) -> int:
     """Count PNG frames in input directory."""
-    frames = list(INPUT_DIR.glob("frame_*.png"))
+    frames = list(input_dir.glob("frame_*.png"))
     return len(frames)
 
 
-def create_video() -> bool:
+def create_video(input_dir: Path, output_file: Path, fps: int) -> bool:
     """Create video from PNG sequence."""
-    input_path = INPUT_DIR / INPUT_PATTERN
+    input_pattern = input_dir / "frame_%04d.png"
     
     cmd = [
         "ffmpeg",
         "-y",                                 # Overwrite output
-        "-framerate", str(FPS),
-        "-i", str(input_path),
-        "-c:v", CODEC,
-        "-pix_fmt", PIXEL_FORMAT,
-        "-crf", str(CRF),
-        "-preset", PRESET,
-        str(OUTPUT_FILE)
+        "-framerate", str(fps),
+        "-i", str(input_pattern),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-crf", "18",
+        "-preset", "medium",
+        str(output_file)
     ]
     
     print(f"Running: {' '.join(cmd)}")
@@ -70,6 +55,17 @@ def create_video() -> bool:
 
 def main() -> None:
     """Main entry point."""
+    parser = argparse.ArgumentParser(description='Create video from PNG sequence')
+    parser.add_argument('-i', '--input', required=True, help='Input directory containing PNG frames')
+    parser.add_argument('-o', '--output', required=True, help='Output video file path')
+    parser.add_argument('--fps', type=int, default=60, help='Frames per second')
+    
+    args = parser.parse_args()
+    
+    input_dir = Path(args.input)
+    output_file = Path(args.output)
+    fps = args.fps
+    
     print("=" * 60)
     print("Create Video from PNG Sequence")
     print("=" * 60)
@@ -81,31 +77,31 @@ def main() -> None:
         sys.exit(1)
     
     # Check input
-    if not INPUT_DIR.exists():
-        print(f"ERROR: Input directory not found: {INPUT_DIR}")
+    if not input_dir.exists():
+        print(f"ERROR: Input directory not found: {input_dir}")
         sys.exit(1)
     
-    num_frames = count_frames()
+    num_frames = count_frames(input_dir)
     if num_frames == 0:
-        print(f"ERROR: No PNG frames found in {INPUT_DIR}")
+        print(f"ERROR: No PNG frames found in {input_dir}")
         sys.exit(1)
     
-    print(f"Input directory: {INPUT_DIR}")
+    print(f"Input directory: {input_dir}")
     print(f"Found {num_frames} frames")
-    print(f"FPS: {FPS}")
-    print(f"Output: {OUTPUT_FILE}")
+    print(f"FPS: {fps}")
+    print(f"Output: {output_file}")
     print("-" * 60)
     
     # Create output directory
-    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
     
     # Create video
-    if create_video():
+    if create_video(input_dir, output_file, fps):
         print("-" * 60)
         print(f"Video created successfully!")
-        print(f"Output: {OUTPUT_FILE}")
-        duration = num_frames / FPS
-        print(f"Duration: {duration:.2f} seconds ({num_frames} frames @ {FPS} fps)")
+        print(f"Output: {output_file}")
+        duration = num_frames / fps
+        print(f"Duration: {duration:.2f} seconds ({num_frames} frames @ {fps} fps)")
         print("=" * 60)
     else:
         print("ERROR: Failed to create video")
