@@ -1,12 +1,9 @@
 **/output/
-src/outputs
-src/output
-src/output_new
-/SPH_Taichi
-/taichi_sph
-/SPlisHSPlasH
 .DS_Store
 *.mp4
+*.png
+*.obj
+*.ply
 *.ini
 *.pyc
 .idea
