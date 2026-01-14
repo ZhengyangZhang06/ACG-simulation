@@ -46,8 +46,8 @@
 			"density": 1000.0,
 			"color": [50, 100, 200],
 			"material": {
-				"materialName": "Sea Water.001",
-				"materialFile": "assets/materials/water2.blend"
+				"materialName": "Water",
+				"materialFile": "assets/materials/water.blend"
 			}
 		}
 	],
