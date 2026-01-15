@@ -1018,21 +1018,7 @@ def _sat_test_worker(
 
 def demo_scene() -> List[RigidBody]:
     bodies = []
-    mesh_path = Path("../assets/meshes/convex_gem.obj")
-    if mesh_path.exists():
-        gem_shape = load_convex_mesh(mesh_path, scale=2.00)
-        bodies.append(
-            RigidBody(
-                name="Gem",
-                mass=1.2,
-                size=None,
-                shape=gem_shape,
-                position=(-0.2, 5.0, -0.5),
-                velocity=(0.4, -0.2, 0.5),
-                angular_velocity=(0.8, 2.5, -0.3),
-                restitution=0.1,
-            )
-        )
+    mesh_path = Path("../../assets/meshes/convex_gem.obj")
     if mesh_path.exists():
         gem_shape = load_convex_mesh(mesh_path, scale=2.00)
         bodies.append(
@@ -1047,49 +1033,21 @@ def demo_scene() -> List[RigidBody]:
                 restitution=0.1,
             )
         )
+    
+    mesh_path = Path("../../assets/meshes/bunny.obj")
     if mesh_path.exists():
-        gem_shape = load_convex_mesh(mesh_path, scale=2.00)
         bodies.append(
             RigidBody(
-                name="Gem_2",
-                mass=1.2,
+                name="CrateA",
+                mass=3.0,
                 size=None,
-                shape=gem_shape,
-                position=(-0.2, 5.0, -0.5),
-                velocity=(0.4, -0.2, 0.5),
-                angular_velocity=(0.8, 2.5, -0.3),
-                restitution=0.1,
+                shape=load_convex_mesh(mesh_path, scale=0.5),
+                position=(0.0, 8.0, 0.0),
+                velocity=(0.0, 0.0, 0.0),
+                angular_velocity=(0.0, 0.0, 0.0),
+                restitution=0.05,
             )
         )
-    if mesh_path.exists():
-        gem_shape = load_convex_mesh(mesh_path, scale=2.00)
-        bodies.append(
-            RigidBody(
-                name="Gem_3",
-                mass=1.2,
-                size=None,
-                shape=gem_shape,
-                position=(-0.2, 5.0, -0.5),
-                velocity=(0.4, -0.2, 0.5),
-                angular_velocity=(0.8, 2.5, -0.3),
-                restitution=0.1,
-            )
-        )
-    if mesh_path.exists():
-        gem_shape = load_convex_mesh(mesh_path, scale=2.00)
-        bodies.append(
-            RigidBody(
-                name="Gem_4",
-                mass=1.2,
-                size=None,
-                shape=gem_shape,
-                position=(-0.2, 5.0, -0.5),
-                velocity=(0.4, -0.2, 0.5),
-                angular_velocity=(0.8, 2.5, -0.3),
-                restitution=0.1,
-            )
-        )
-
     
     return bodies
 
@@ -1099,7 +1057,7 @@ def main() -> None:
     config = SimulationConfig(duration=5.0, dt=1.0 / 48)
     impulses = [
         ImpulseEvent(time=0.2, body_name="CrateA", impulse=(5.0, 0.0, 3.0)),
-        ImpulseEvent(time=0.5, body_name="CrateB", impulse=(2.0, 1.0, 1.5), local_offset=(0.0, 0.3, 0.0)),
+        # ImpulseEvent(time=0.5, body_name="CrateB", impulse=(2.0, 1.0, 1.5), local_offset=(0.0, 0.3, 0.0)),
     ]
     sim = RigidBodySimulation(demo_scene(), config, impulses=impulses)
     try:

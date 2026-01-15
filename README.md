@@ -59,6 +59,7 @@ python src/run.py --scene src/configs/{scene_name}.json
 - `output/{scene_name}/mesh_output/obj_{objectId}/obj_{objectId}_*.obj`: meshes of rigid bodies;
 - `output/{scene_name}/images/*.png`: raw particle images.
 
+For rigid body simulation, enter the directory `src/backup/` and follow the instructions in `RIGID.md`.
 
 ### Step 2: Surface Reconstruction (no need for rigid simulation)
 ```bash
