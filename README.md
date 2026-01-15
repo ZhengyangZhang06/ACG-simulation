@@ -3,9 +3,29 @@
 ## Overview
 This project implements a comprehensive physics simulation system, focusing on the interaction between Smoothed Particle Hydrodynamics (SPH) fluids and rigid bodies. We implemented a basic 2D and 3D Weakly Compressible SPH (WCSPH) fluid simulator with robust fluid-solid coupling, reconstructed fluid surfaces, and rendered high-quality results using Blender. 
 
-Furthermore, we developed a multithreaded rigid body simulator, a real-time interactive 2D playground, and a creative ``Bad Apple'' fluid animation driven by distance fields. The system demonstrates significant acceleration through GPU computing and algorithmic optimizations.
+Furthermore, we developed a multithreaded rigid body simulator, a real-time interactive 2D playground, and a creative "Bad Apple" fluid animation driven by distance fields. The system demonstrates significant acceleration through GPU computing and algorithmic optimizations.
 
 Most code is written in Taichi language.
+
+## Demonstration
+Basic fluid standard dam-break scenario.
+![fluid](demos/fluid.png)
+
+Fluid simulation coupling with a fix rigid body.
+![dragon](demos/dragon.png)
+
+Fluid simulation coupling with a move rigid body.
+![cat](demos/cat.png)
+![bunny](demos/bunny.png)
+
+"Bad Apple" fluid simulation with a clear water wave.
+![wave](demos/wave.png)
+
+Real-time interaction: Mouse cursor applying a repulsive force to the fluid particles.
+![interact](demos/interact.png)
+
+Compressed demos are in `demos/`, all the uncompressed raw and rendered demos are available at [tsinghua cloud](https://cloud.tsinghua.edu.cn/d/d7a64a11f1b3435c959f/). The "Bad Apple" fluid simulation animation is uploaded to [bilibili](https://www.bilibili.com/video/BV1XZv8BZE21/?share_source=copy_web&vd_source=219034b02a3fee6a10687b0a949d28fc).
+
 
 ## Environment Setup
 
@@ -126,23 +146,6 @@ python src/render/create_video.py -i output/badapple_small/render -o output/bada
 **Output:** 
 - `output/badapple_small/raw.mp4`: video of raw particles.
 - `output/badapple_small/animation.mp4`: final Blender rendered video.
-
-
-## Demonstration
-Basic fluid standard dam-break scenario.
-![fluid](demos/fluid.png)
-
-Fluid simulation coupling with a fix rigid body.
-![dragon](demos/dragon.png)
-
-Fluid simulation coupling with a move rigid body.
-![cat](demos/cat.png)
-![bunny](demos/bunny.png)
-
-"Bad Apple" fluid simulation with a clear water wave.
-![wave](demos/wave.png)
-
-Compressed demos are in `demos/`, all the uncompressed raw and rendered demos are available at [tsinghua cloud](https://cloud.tsinghua.edu.cn/d/d7a64a11f1b3435c959f/). The "Bad Apple" fluid simulation animation is uploaded to [bilibili](https://www.bilibili.com/video/BV1XZv8BZE21/?share_source=copy_web&vd_source=219034b02a3fee6a10687b0a949d28fc).
 
 
 ## References
